@@ -2,12 +2,33 @@
 
 {% block content %}
 <div id="weather-results">
+    <!-- Weather Summary Card -->
     <div class="card">
         <div class="weather-info">
             <span>Temperature: {{ "%.1f"|format(temp) }}°F</span>
             <span>{{ conditions }}</span>
         </div>
         
+        <div class="weather-summary">
+            {{ summary }}
+        </div>
+    </div>
+
+    <!-- Safety Alerts Card -->
+    {% if safety_recommendations %}
+    <div class="card safety-card">
+        <h2>Safety Notes</h2>
+        {% for rec in safety_recommendations %}
+        <div class="recommendation safety-alert">
+            {{ rec }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Clothing Recommendations Card -->
+    <div class="card">
+        <h2>What to Wear</h2>
         {% for recommendation in recommendations %}
         <div class="recommendation">
             {{ recommendation }}
@@ -15,18 +36,142 @@
         {% endfor %}
     </div>
 
-    <div class="card">
+    <!-- Forecast Chart Card -->
+    <div class="card forecast-card">
         <h2>24-Hour Forecast</h2>
         <div class="forecast-chart-container">
-            <canvas id="forecastChart" class="forecast-chart"></canvas>
+            <canvas id="forecastChart"></canvas>
         </div>
+        <!-- Debug info -->
+        <div id="chart-debug" style="display: none; margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);"></div>
     </div>
+    
+    <!-- Store forecast data -->
+    <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
+    
+    <!-- Debug output -->
+    <script>
+        (function() {
+            try {
+                const forecastData = JSON.parse('{{ forecast|tojson|safe }}');
+                console.log('Forecast data:', forecastData);
+            } catch (error) {
+                console.error('Error parsing forecast data:', error);
+            }
+        })();
+    </script>
 </div>
 
 <script>
-    // Wait for the next tick to ensure DOM is ready
-    setTimeout(function() {
-        initializeChart({{ forecast|tojson }});
-    }, 0);
+    // Initialize chart when this content is swapped in by HTMX
+    document.addEventListener('htmx:afterSwap', function() {
+        const debug = document.getElementById('chart-debug');
+        debug.style.display = 'block';
+        debug.innerHTML = 'Initializing chart...';
+
+        try {
+            // Verify Chart.js is loaded
+            if (!window.Chart) {
+                const msg = 'Chart.js not loaded. Waiting...';
+                console.error(msg);
+                debug.innerHTML = msg;
+                return;
+            }
+
+            // Get the raw forecast data
+            const forecastInput = document.getElementById('forecast-data');
+            if (!forecastInput) {
+                const msg = 'Forecast data element not found';
+                console.error(msg);
+                debug.innerHTML = msg;
+                return;
+            }
+
+            // Parse and validate the data
+            const rawData = forecastInput.value;
+            debug.innerHTML = `Raw data: ${rawData}`;
+
+            const forecastData = JSON.parse(rawData);
+            if (!Array.isArray(forecastData)) {
+                const msg = 'Forecast data is not an array';
+                console.error(msg);
+                debug.innerHTML = msg;
+                return;
+            }
+
+            if (forecastData.length === 0) {
+                const msg = 'Forecast data array is empty';
+                console.warn(msg);
+                debug.innerHTML = msg;
+                return;
+            }
+
+            // Log the data structure
+            debug.innerHTML = `Found ${forecastData.length} data points.<br>First point: ${JSON.stringify(forecastData[0])}`;
+
+            // Initialize the chart
+            const chart = initializeChart(forecastData);
+            if (chart) {
+                debug.innerHTML = 'Chart initialized successfully!';
+                // Hide debug info after 5 seconds if successful
+                setTimeout(() => {
+                    debug.style.display = 'none';
+                }, 5000);
+            }
+        } catch (error) {
+            const msg = `Error: ${error.message}`;
+            console.error(msg);
+            debug.innerHTML = msg;
+        }
+    });
 </script>
+
+<!-- Hidden input to store forecast data -->
+<input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
+
+
+<style>
+    .weather-summary {
+        font-size: 1.1rem;
+        margin: 1rem 0;
+        color: var(--text-primary);
+        line-height: 1.6;
+    }
+
+    .safety-card {
+        border: 2px solid var(--error);
+    }
+
+    .safety-alert {
+        color: var(--error);
+        font-weight: 500;
+    }
+
+    .forecast-card {
+        padding: 1.5rem;
+    }
+
+    .forecast-chart-container {
+        background: var(--bg-primary);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    canvas#forecastChart {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 400px;
+    }
+
+    h2 {
+        color: var(--accent);
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+    }
+</style>
 {% endblock %}
