@@ -1,0 +1,14 @@
+[project]
+name = "dad-can-i-wear"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.109.2",
+    "httpx==0.26.0",
+    "jinja2==3.1.3",
+    "python-dotenv==1.0.1",
+    "python-multipart==0.0.9",
+    "uvicorn==0.27.1",
+]

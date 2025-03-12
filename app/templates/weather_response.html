@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="weather-results">
+    <div class="card">
+        <div class="weather-info">
+            <span>Temperature: {{ "%.1f"|format(temp) }}°F</span>
+            <span>{{ conditions }}</span>
+        </div>
+        
+        {% for recommendation in recommendations %}
+        <div class="recommendation">
+            {{ recommendation }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <h2>24-Hour Forecast</h2>
+        <div class="forecast-chart-container">
+            <canvas id="forecastChart" class="forecast-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Wait for the next tick to ensure DOM is ready
+    setTimeout(function() {
+        initializeChart({{ forecast|tojson }});
+    }, 0);
+</script>
+{% endblock %}

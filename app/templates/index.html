@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Dad, Can I Wear This? 👕</h1>
+<div class="card">
+    <form 
+        hx-post="/weather" 
+        hx-target="#weather-results"
+        hx-indicator=".loading"
+    >
+        <input 
+            type="text" 
+            name="zip_code" 
+            placeholder="Enter ZIP code" 
+            value="{{ default_zip }}"
+            pattern="[0-9]{5}"
+            title="Please enter a valid 5-digit ZIP code"
+            required
+        >
+        <button type="submit">Check Weather</button>
+    </form>
+</div>
+
+<div id="weather-results"></div>
+<div class="loading" style="display:none;">
+    Checking the weather... ⛅
+</div>
+{% endblock %}
