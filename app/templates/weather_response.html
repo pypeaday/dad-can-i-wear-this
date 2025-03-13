@@ -37,6 +37,17 @@
         {% endfor %}
     </div>
 
+    <!-- Forecast Chart Card -->
+    <div class="card forecast-card">
+        <h2>Today's Temperature</h2>
+        <div class="forecast-subtitle">3-hour intervals from OpenWeatherMap</div>
+        <div class="forecast-chart-container">
+            <canvas id="forecastChart"></canvas>
+        </div>
+    </div>
+    
+    <!-- Store forecast data -->
+    <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
 </div>
 
 
@@ -57,7 +68,32 @@
         font-weight: 500;
     }
 
+    .forecast-card {
+        padding: 1.5rem;
+    }
 
+    .forecast-subtitle {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+    }
+
+    .forecast-chart-container {
+        background: var(--bg-primary);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    canvas#forecastChart {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 400px;
+    }
 
     h2 {
         color: var(--accent);

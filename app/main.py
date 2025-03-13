@@ -67,7 +67,8 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                     "lat": lat,
                     "lon": lon,
                     "appid": OPENWEATHER_API_KEY,
-                    "units": "imperial"
+                    "units": "imperial",
+                    "cnt": 40  # Get maximum number of points (5 days)
                 }
             )
             
@@ -116,13 +117,35 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             # Process forecast data
             forecast = []
             
-            # Get current forecast point
+            # Get today's date in ET
+            now = datetime.now(ZoneInfo('America/New_York'))
+            today = now.date()
+            
+            # Get the start and end of today's forecast window (7 AM to 8 PM)
+            start_time = datetime(
+                today.year, today.month, today.day, 7, 0, 0,
+                tzinfo=ZoneInfo('America/New_York')
+            )
+            end_time = datetime(
+                today.year, today.month, today.day, 20, 0, 0,
+                tzinfo=ZoneInfo('America/New_York')
+            )
+            
+            # Process all forecast points for today between 7 AM and 8 PM
             for item in forecast_items:
                 try:
-                    # Validate data structure
-                    if not isinstance(item, dict):
+                    # Get timestamp and convert to ET
+                    timestamp = item.get('dt', 0)
+                    if timestamp <= 0:
+                        continue
+                        
+                    forecast_time = datetime.fromtimestamp(timestamp, tz=ZoneInfo('America/New_York'))
+                    
+                    # Skip if not between start and end time
+                    if forecast_time < start_time or forecast_time > end_time:
                         continue
 
+                    # Validate data structure
                     main_data = item.get('main', {})
                     if not isinstance(main_data, dict):
                         continue
@@ -147,11 +170,14 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
 
                     # Add valid forecast point
                     forecast.append({
+                        'time': timestamp * 1000,  # Convert to milliseconds for Chart.js
                         'temp': round(temp, 1),
                         'feels_like': round(feels_like, 1),
                         'description': description
                     })
-                    break  # Only need the current forecast
+                    
+                    # Debug logging
+                    print(f"Including point - Time: {forecast_time.strftime('%I:%M %p')}: {temp}°F (feels like {feels_like}°F)")
                 except Exception as e:
                     print(f"Error processing forecast item: {e}")
                     continue

@@ -8,6 +8,14 @@
     <!-- Load HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
+    <!-- Load Chart.js and plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    
+    <!-- Load our chart initialization code -->
+    <script src="/static/js/chart.js"></script>
+    
     <!-- Add HTMX event handlers -->
     <script>
         document.addEventListener('htmx:beforeRequest', function(evt) {
@@ -27,6 +35,25 @@
             const modal = document.getElementById('loadingModal');
             if (modal) modal.classList.remove('active');
             console.error('HTMX request error:', evt.detail);
+        });
+
+        // Handle Chart.js initialization after HTMX swaps
+        document.addEventListener('htmx:afterSwap', function(evt) {
+            // Give the DOM a moment to stabilize
+            setTimeout(function() {
+                const canvas = document.getElementById('forecastChart');
+                if (canvas) {
+                    const data = document.getElementById('forecast-data');
+                    if (data && data.value) {
+                        try {
+                            const forecast = JSON.parse(data.value);
+                            initializeChart(forecast);
+                        } catch (error) {
+                            console.error('Error initializing chart:', error);
+                        }
+                    }
+                }
+            }, 50);
         });
 
 
