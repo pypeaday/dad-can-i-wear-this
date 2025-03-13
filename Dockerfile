@@ -1,37 +1,39 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Set environment variables
-ENV VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
 
 # Install uv
 RUN pip install uv
 
+# Create a non-root user and set permissions
+RUN mkdir -p /app/data && \
+    useradd -m appuser && \
+    chown -R appuser:appuser /app && \
+    chmod 755 /app/data && \
+    mkdir -p /opt/venv && \
+    chown -R appuser:appuser /opt/venv
+
 # Set working directory
 WORKDIR /app
 
-# Create data directory for SQLite database
-RUN mkdir /app/data
-
-# Create a non-root user and set permissions
-RUN useradd -m appuser && \
-    chown -R appuser:appuser /app && \
-    chmod 755 /app/data
-
 # Copy entrypoint script
-COPY docker-entrypoint.sh /app/
+COPY --chown=appuser:appuser docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-USER appuser
+# Copy the rest of the application
+COPY --chown=appuser:appuser . .
 
+USER appuser
 # Create and activate virtual environment
 RUN uv venv $VIRTUAL_ENV
-
-# Copy the rest of the application
-COPY . .
+ENV UV_PYTHON=$VIRTUAL_ENV/bin/python
 
 # Install dependencies using uv in the virtual environment
-RUN uv sync
+RUN uv sync --active
+
+RUN ls -alh 
 
 # Expose port
 EXPOSE 8000
