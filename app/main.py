@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from .llm import get_clothing_recommendations
 
 # Load environment variables from the root .env file
@@ -59,7 +60,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                 forecast = []
                 return
             
-            # Fetch forecast data
+            # Fetch forecast data using 5-day/3-hour forecast API
             forecast_response = await client.get(
                 "http://api.openweathermap.org/data/2.5/forecast",
                 params={
@@ -69,6 +70,9 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                     "units": "imperial"
                 }
             )
+            
+            # Debug logging
+            print("Fetching forecast data from OpenWeatherMap API...")
             
             # Validate response
             if forecast_response.status_code != 200:
@@ -88,7 +92,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                 forecast = []
                 return
 
-            # Process forecast data for the next 24 hours
+            # Process forecast data
             forecast = []
             forecast_items = forecast_data.get('list', [])
             
@@ -97,8 +101,23 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                 forecast = []
                 return
 
-            # Take first 8 items (24 hours, 3-hour intervals)
-            for item in forecast_items[:8]:
+            # Sort forecast items by timestamp to ensure chronological order
+            forecast_items.sort(key=lambda x: x.get('dt', 0))
+
+            # Debug logging for forecast data
+            print("\nForecast data from API (3-hour intervals):")
+            print("Note: OpenWeatherMap provides data every 3 hours")
+            for item in forecast_items:
+                dt = datetime.fromtimestamp(item.get('dt', 0), tz=ZoneInfo('America/New_York'))
+                temp = item.get('main', {}).get('temp')
+                feels_like = item.get('main', {}).get('feels_like')
+                print(f"- {dt.strftime('%Y-%m-%d %I:%M %p')}: {temp}°F (feels like {feels_like}°F)")
+
+            # Process forecast data
+            forecast = []
+            
+            # Get current forecast point
+            for item in forecast_items:
                 try:
                     # Validate data structure
                     if not isinstance(item, dict):
@@ -106,10 +125,6 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
 
                     main_data = item.get('main', {})
                     if not isinstance(main_data, dict):
-                        continue
-
-                    weather_list = item.get('weather', [])
-                    if not isinstance(weather_list, list) or not weather_list:
                         continue
 
                     # Extract and validate temperature data
@@ -124,21 +139,19 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                         print(f"Invalid temperature values: temp={temp}, feels_like={feels_like}")
                         continue
 
-                    # Format forecast point
-                    forecast_point = {
-                        'time': int(item.get('dt', 0)),
+                    # Get weather description
+                    weather_list = item.get('weather', [])
+                    description = 'Unknown'
+                    if isinstance(weather_list, list) and weather_list:
+                        description = str(weather_list[0].get('main', 'Unknown'))
+
+                    # Add valid forecast point
+                    forecast.append({
                         'temp': round(temp, 1),
                         'feels_like': round(feels_like, 1),
-                        'description': str(weather_list[0].get('main', 'Unknown'))
-                    }
-
-                    # Validate forecast point
-                    if forecast_point['time'] <= 0:
-                        print("Invalid timestamp")
-                        continue
-
-                    forecast.append(forecast_point)
-
+                        'description': description
+                    })
+                    break  # Only need the current forecast
                 except Exception as e:
                     print(f"Error processing forecast item: {e}")
                     continue
@@ -180,6 +193,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
         {
             "request": request,
             "temp": temp,
+            "wind_speed": wind_speed,
             "conditions": conditions.title(),
             "summary": summary,
             "safety_recommendations": safety_recs,

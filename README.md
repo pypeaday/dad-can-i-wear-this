@@ -6,6 +6,8 @@ A smart, mobile-first web application that helps answer weather-related clothing
 
 - Simple ZIP code-based weather lookup
 - AI-powered clothing recommendations using local LLM
+  - Graceful fallback to standard recommendations when Ollama is unavailable
+  - Automatically resumes AI features when Ollama becomes available
 - 24-hour temperature forecast visualization
 - Mobile-first dark theme
 - Clean, modern UI with HTMX for smooth interactions

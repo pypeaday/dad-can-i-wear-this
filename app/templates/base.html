@@ -8,24 +8,6 @@
     <!-- Load HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
-    <!-- Load Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    
-    <!-- Configure Chart.js defaults -->
-    <script>
-        // Set Chart.js defaults
-        if (typeof Chart !== 'undefined') {
-            Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
-            Chart.defaults.color = '#ffffff';
-            Chart.defaults.responsive = true;
-            Chart.defaults.maintainAspectRatio = false;
-            console.log('Chart.js configured successfully');
-        }
-    </script>
-    
-    <!-- Load our chart initialization code -->
-    <script src="/static/js/chart.js"></script>
-    
     <!-- Add HTMX event handlers -->
     <script>
         document.addEventListener('htmx:beforeRequest', function(evt) {
@@ -47,24 +29,7 @@
             console.error('HTMX request error:', evt.detail);
         });
 
-        // Handle Chart.js initialization after HTMX swaps
-        document.addEventListener('htmx:afterSwap', function(evt) {
-            // Give the DOM a moment to stabilize
-            setTimeout(function() {
-                const canvas = document.getElementById('forecastChart');
-                if (canvas) {
-                    const data = document.getElementById('forecast-data');
-                    if (data && data.value) {
-                        try {
-                            const forecast = JSON.parse(data.value);
-                            initializeChart(forecast);
-                        } catch (error) {
-                            console.error('Error initializing chart:', error);
-                        }
-                    }
-                }
-            }, 50);
-        });
+
     </script>
     <style>
         :root {
@@ -100,20 +65,7 @@
             padding: var(--padding);
         }
 
-        .forecast-chart-container {
-            position: relative;
-            height: 350px;
-            width: 100%;
-            margin: 1rem 0;
-            background-color: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 1rem;
-        }
 
-        .forecast-chart {
-            width: 100% !important;
-            height: 100% !important;
-        }
 
         h1 {
             color: var(--accent);
@@ -126,7 +78,7 @@
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
         }
 
         input[type="text"] {
