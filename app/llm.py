@@ -116,7 +116,15 @@ async def get_clothing_recommendations(weather_data: Dict) -> Tuple[str, List[st
         prompt = f"""Based on these weather conditions and safety considerations, what specific clothing items should someone wear? 
 Be practical and specific. Format each recommendation on a new line with an emoji.
 
-IMPORTANT: All temperatures are in Fahrenheit (°F):
+IMPORTANT: ALWAYS include a specific recommendation for pants/shorts based on the temperature:
+- Below 32°F: Heavy pants, thermal underwear
+- 32-50°F: Long pants, possibly thermal for lower end
+- 50-65°F: Long pants or jeans
+- 65-75°F: Light pants or shorts depending on preference
+- 75-85°F: Shorts or light pants
+- Above 85°F: Shorts
+
+All temperatures are in Fahrenheit (°F):
 - Below 32°F is freezing (heavy winter clothing needed)
 - 32-50°F is cold (winter coat, layers)
 - 50-65°F is cool (light jacket or sweater)

@@ -63,6 +63,20 @@ def get_standard_recommendations(weather_data: Dict) -> List[str]:
         recommendations.append("👕 Base layer: Long sleeve shirt")
     else:
         recommendations.append("👕 Base layer: T-shirt or short sleeves")
+        
+    # Pants/shorts recommendations
+    if feels_like < 32:
+        recommendations.append("👖 Bottoms: Heavy pants with thermal underwear")
+    elif feels_like < 50:
+        recommendations.append("👖 Bottoms: Long pants, possibly thermal for lower temperatures")
+    elif feels_like < 65:
+        recommendations.append("👖 Bottoms: Long pants or jeans")
+    elif feels_like < 75:
+        recommendations.append("👖 Bottoms: Light pants or shorts depending on preference")
+    elif feels_like < 85:
+        recommendations.append("🩳 Bottoms: Shorts or very light pants")
+    else:
+        recommendations.append("🩳 Bottoms: Shorts")
     
     # Mid layer recommendations
     if feels_like < 40:
