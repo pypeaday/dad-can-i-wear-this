@@ -121,41 +121,21 @@ async def get_clothing_recommendations(
 
     try:
         # Try to get AI-powered clothing recommendations
-        prompt = f"""Based on these weather conditions and safety considerations, recommend clothing using a layering system:
-1. Base layer (against skin)
-2. Mid layer (insulation)
-3. Outer layer (weather protection)
-4. Accessories (hat, gloves, etc.)
+        prompt = f"""Given these weather conditions and safety considerations, provide friendly, easy-to-understand clothing recommendations. Focus on comfort and practicality.
 
-Format each recommendation on a new line with an emoji. Consider these temperature guidelines:
+Use this structure, but make it conversational and natural:
+1. Base Layer - What to wear against your skin
+2. Bottoms - What pants/shorts to wear
+3. Mid Layer - Any sweaters or extra warmth needed
+4. Outer Layer - Jackets or coats if needed
+5. Accessories - Hats, gloves, etc.
 
-Base Layer:
-- Below 30°F: Thermal underwear/heat tech
-- 30-45°F: Long sleeve shirt
-- Above 45°F: T-shirt/short sleeves
-
-Bottoms:
-- Below 32°F: Heavy pants with thermal layer
-- 32-50°F: Long pants, possibly thermal
-- 50-65°F: Long pants/jeans
-- 65-75°F: Light pants or shorts
-- 75-85°F: Shorts or very light pants
-- Above 85°F: Shorts
-
-Mid Layer (if needed):
-- Below 40°F: Fleece/wool sweater
-- 40-55°F: Light sweater
-- Above 55°F: Optional based on preference
-
-Outer Layer:
-- Below 32°F: Heavy winter coat
-- 32-45°F: Winter coat
-- 45-60°F: Light jacket
-- Above 60°F: Optional windbreaker if windy
-
-Accessories:
-- Below 40°F: Scarf, gloves, warm hat
-- Above 75°F: Sun hat recommended
+Important notes:
+- Add an appropriate emoji for each item
+- Keep it simple and clear - no technical temperature ranges
+- Only recommend layers that are actually needed for the weather
+- Consider both comfort and protection
+- If it's warm, you can skip layers that aren't needed
 
 Weather data:
 {json.dumps(weather_data, indent=2)}
@@ -163,7 +143,7 @@ Weather data:
 Safety considerations:
 {json.dumps(safety_recs, indent=2)}
 
-Clothing recommendations:"""
+Please provide natural, friendly clothing recommendations:"""
 
         response = client.chat(
             model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}]
