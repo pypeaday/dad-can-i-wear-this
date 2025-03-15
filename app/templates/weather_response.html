@@ -30,12 +30,91 @@
     <!-- Clothing Recommendations Card -->
     <div class="card">
         <h2>What to Wear</h2>
-        {% for recommendation in recommendations %}
-        <div class="recommendation">
-            {{ recommendation }}
+        <div class="layers-container">
+            <!-- Base Layer -->
+            <div class="layer-section">
+                <h3>1. Base Layer</h3>
+                {% for recommendation in recommendations %}
+                    {% if 'Base layer' in recommendation or 'base layer' in recommendation %}
+                        <div class="recommendation">{{ recommendation }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Bottoms -->
+            <div class="layer-section">
+                <h3>2. Bottoms</h3>
+                {% for recommendation in recommendations %}
+                    {% if 'Bottoms' in recommendation or 'pants' in recommendation.lower() or 'shorts' in recommendation.lower() %}
+                        <div class="recommendation">{{ recommendation }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Mid Layer -->
+            <div class="layer-section">
+                <h3>3. Mid Layer</h3>
+                {% for recommendation in recommendations %}
+                    {% if 'Mid layer' in recommendation or 'mid layer' in recommendation %}
+                        <div class="recommendation">{{ recommendation }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Outer Layer -->
+            <div class="layer-section">
+                <h3>4. Outer Layer</h3>
+                {% for recommendation in recommendations %}
+                    {% if 'Outer layer' in recommendation or 'outer layer' in recommendation %}
+                        <div class="recommendation">{{ recommendation }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Accessories -->
+            <div class="layer-section">
+                <h3>5. Accessories</h3>
+                {% for recommendation in recommendations %}
+                    {% if ('scarf' in recommendation.lower() or
+                          'gloves' in recommendation.lower() or
+                          'hat' in recommendation.lower() or
+                          'umbrella' in recommendation.lower() or
+                          'shoes' in recommendation.lower() or
+                          'boots' in recommendation.lower()) %}
+                        <div class="recommendation">{{ recommendation }}</div>
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
-        {% endfor %}
     </div>
+
+    <style>
+        .layers-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .layer-section {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .layer-section h3 {
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .recommendation {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+    </style>
 
     <!-- Forecast Chart Card -->
     <div class="card forecast-card">
