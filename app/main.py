@@ -14,21 +14,14 @@ from zoneinfo import ZoneInfo
 from .llm import get_clothing_recommendations
 
 
-# Load version from pyproject.toml
-def get_version():
-    try:
-        with open(Path(__file__).resolve().parent.parent / "pyproject.toml", "rb") as f:
-            return tomli.load(f)["project"]["version"]
-    except Exception:
-        return "unknown"
-
+from .__about__ import __version__
 
 # Load environment variables from the root .env file
 root_dir = Path(__file__).resolve().parent.parent
 env_path = root_dir / ".env"
 load_dotenv(env_path)
 
-VERSION = get_version()
+VERSION = __version__
 app = FastAPI(title="Dad, Can I Wear This?", version=VERSION)
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))

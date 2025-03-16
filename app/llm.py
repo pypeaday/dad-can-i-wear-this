@@ -16,7 +16,7 @@ load_dotenv(env_path)
 
 # Get Ollama settings from environment or use defaults
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "dolphin3:latest")
 
 # Configure Ollama client
 client = Client(host=OLLAMA_HOST)
