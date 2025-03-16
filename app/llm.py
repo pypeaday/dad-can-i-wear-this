@@ -160,97 +160,115 @@ Provide recommendations in the exact format shown above, maintaining consistent 
         # Get standard recommendations as a base
         standard_recs = safety.get_standard_recommendations(weather_data)
 
-        # Parse the response and clean up
+        # Get standard recommendations as a base set
+        clothing_recs = standard_recs.copy()
+
+        # Parse and clean up AI response
         ai_recs = [
             line.strip()
             for line in response.message["content"].split("\n")
             if line.strip()
         ]
 
-        # Combine recommendations if AI provided enough suggestions
-        if len(ai_recs) >= 3:
-            # Create categories for organizing recommendations
-            base_layer = []
-            mid_layer = []
-            outer_layer = []
-            bottoms = []
-            accessories = []
-            footwear = []
+        # Helper function to extract emoji from a string
+        def extract_emoji(text):
+            return "".join(c for c in text if not c.isalnum() and not c.isspace())
 
-            # Categorize standard recommendations
-            for rec in standard_recs:
-                if "Base layer" in rec:
-                    base_layer.append(rec)
-                elif "Mid layer" in rec:
-                    mid_layer.append(rec)
-                elif "Outer layer" in rec:
-                    outer_layer.append(rec)
-                elif "Bottoms" in rec:
-                    bottoms.append(rec)
-                elif any(
-                    acc in rec.lower() for acc in ["scarf", "gloves", "hat", "umbrella"]
-                ):
-                    accessories.append(rec)
-                elif any(foot in rec.lower() for foot in ["shoes", "boots"]):
-                    footwear.append(rec)
+        # Helper function to clean text for comparison
+        def clean_text(text):
+            return "".join(c.lower() for c in text if c.isalnum())
 
-            # Add AI recommendations to appropriate categories
-            for rec in ai_recs:
-                rec = rec.strip()
-                if not rec:
-                    continue
+        # Process AI recommendations
+        for ai_rec in ai_recs:
+            ai_rec = ai_rec.strip()
+            if not ai_rec:
+                continue
 
-                # Categorize based on keywords
-                if any(
-                    base in rec.lower()
-                    for base in ["base layer", "shirt", "t-shirt", "thermal"]
-                ):
-                    base_layer.append(rec)
-                elif any(
-                    mid in rec.lower() for mid in ["mid layer", "sweater", "fleece"]
-                ):
-                    mid_layer.append(rec)
-                elif any(
-                    outer in rec.lower() for outer in ["outer layer", "coat", "jacket"]
-                ):
-                    outer_layer.append(rec)
-                elif any(
-                    bottom in rec.lower() for bottom in ["pants", "shorts", "jeans"]
-                ):
-                    bottoms.append(rec)
-                elif any(
-                    acc in rec.lower() for acc in ["scarf", "gloves", "hat", "umbrella"]
-                ):
-                    accessories.append(rec)
-                elif any(foot in rec.lower() for foot in ["shoes", "boots"]):
-                    footwear.append(rec)
-                else:
-                    # If we can't categorize it, add to accessories as a catch-all
-                    accessories.append(rec)
+            # Extract emoji if present, otherwise use a default
+            emoji = extract_emoji(ai_rec) or "👕 "
 
-            # Combine all categories, removing duplicates while preserving emoji
-            def remove_duplicates(items):
-                seen = set()
-                unique = []
-                for item in items:
-                    # Remove emoji for comparison
-                    clean_item = "".join(c for c in item if c.isalnum()).lower()
-                    if clean_item not in seen:
-                        seen.add(clean_item)
-                        unique.append(item)
-                return unique
+            # Clean up the recommendation text
+            clean_ai_rec = clean_text(ai_rec)
 
-            clothing_recs = (
-                remove_duplicates(base_layer)
-                + remove_duplicates(bottoms)
-                + remove_duplicates(mid_layer)
-                + remove_duplicates(outer_layer)
-                + remove_duplicates(accessories)
-                + remove_duplicates(footwear)
+            # Check if this recommendation is unique
+            is_unique = True
+            for i, std_rec in enumerate(clothing_recs):
+                if clean_text(std_rec) == clean_ai_rec:
+                    # Update existing recommendation with AI version if it has emoji
+                    if emoji and not extract_emoji(std_rec):
+                        clothing_recs[i] = ai_rec
+                    is_unique = False
+                    break
+
+            # Add new unique recommendations
+            if is_unique:
+                # Ensure recommendation has proper formatting
+                if not any(
+                    category in ai_rec.lower()
+                    for category in [
+                        "layer",
+                        "bottoms",
+                        "accessories",
+                        "footwear",
+                        "shoes",
+                        "boots",
+                    ]
+                ):
+                    # Add appropriate category if missing
+                    if any(
+                        item in clean_ai_rec for item in ["shirt", "thermal", "tshirt"]
+                    ):
+                        ai_rec = (
+                            f"{emoji}Base Layer: {ai_rec.split(':', 1)[-1].strip()}"
+                        )
+                    elif any(
+                        item in clean_ai_rec for item in ["pants", "shorts", "jeans"]
+                    ):
+                        ai_rec = f"{emoji}Bottoms: {ai_rec.split(':', 1)[-1].strip()}"
+                    elif any(item in clean_ai_rec for item in ["sweater", "fleece"]):
+                        ai_rec = f"{emoji}Mid Layer: {ai_rec.split(':', 1)[-1].strip()}"
+                    elif any(item in clean_ai_rec for item in ["coat", "jacket"]):
+                        ai_rec = (
+                            f"{emoji}Outer Layer: {ai_rec.split(':', 1)[-1].strip()}"
+                        )
+                    elif any(
+                        item in clean_ai_rec
+                        for item in ["scarf", "gloves", "hat", "umbrella"]
+                    ):
+                        ai_rec = (
+                            f"{emoji}Accessories: {ai_rec.split(':', 1)[-1].strip()}"
+                        )
+                    elif any(item in clean_ai_rec for item in ["shoes", "boots"]):
+                        ai_rec = f"{emoji}Footwear: {ai_rec.split(':', 1)[-1].strip()}"
+
+                clothing_recs.append(ai_rec)
+
+        # Ensure we have at least one recommendation for each essential category
+        categories = {
+            "Base Layer": "👕 Base Layer: Appropriate for the weather",
+            "Bottoms": "👖 Bottoms: Appropriate for the weather",
+            "Footwear": "👟 Footwear: Appropriate shoes for the conditions",
+        }
+
+        for category, default_rec in categories.items():
+            if not any(category.lower() in rec.lower() for rec in clothing_recs):
+                clothing_recs.append(default_rec)
+
+        # Sort recommendations by category
+        category_order = [
+            "Base Layer",
+            "Bottoms",
+            "Mid Layer",
+            "Outer Layer",
+            "Accessories",
+            "Footwear",
+        ]
+        clothing_recs.sort(
+            key=lambda x: next(
+                (i for i, cat in enumerate(category_order) if cat.lower() in x.lower()),
+                len(category_order),
             )
-        else:
-            print("AI response too short, using standard recommendations")
-            clothing_recs = standard_recs
+        )
 
     except Exception as e:
         print(f"Error getting clothing recommendations: {e}")
