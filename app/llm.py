@@ -70,21 +70,26 @@ def get_weather_summary(weather_data: Dict) -> str:
         return get_basic_weather_summary(weather_data)
 
     try:
-        prompt = f"""Given these weather conditions, provide a brief, friendly summary in 2-3 sentences. 
-Focus on how it feels and what to expect. Be conversational but informative.
+        prompt = f"""Given these weather conditions, create a natural, engaging weather summary that flows well.
 
-IMPORTANT: All temperatures are in Fahrenheit (°F):
-- Below 32°F is freezing
-- 32-50°F is cold
-- 50-65°F is cool
-- 65-75°F is mild
-- 75-85°F is warm
-- Above 85°F is hot
+Guidelines:
+1. Start with a friendly greeting that includes the temperature and conditions
+2. Add how it actually feels (using the "feels like" temperature)
+3. Mention any notable weather factors (wind, humidity, etc.)
+4. End with a brief mood-setting phrase about the day
+
+Temperature Scale (°F):
+• Below 32° → "frigid/freezing"
+• 32-50° → "quite cold"
+• 50-65° → "cool/crisp"
+• 65-75° → "pleasant/mild"
+• 75-85° → "warm/nice"
+• Above 85° → "hot/very warm"
 
 Weather data:
 {json.dumps(weather_data, indent=2)}
 
-Summary:"""
+Format your response as a flowing paragraph, not bullet points. Make it sound natural and conversational."""
 
         response = client.chat(
             model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}]
@@ -121,21 +126,24 @@ async def get_clothing_recommendations(
 
     try:
         # Try to get AI-powered clothing recommendations
-        prompt = f"""Given these weather conditions and safety considerations, provide friendly, easy-to-understand clothing recommendations. Focus on comfort and practicality.
+        prompt = f"""Based on these weather conditions and safety considerations, create clear, well-formatted clothing recommendations.
 
-Use this structure, but make it conversational and natural:
-1. Base Layer - What to wear against your skin
-2. Bottoms - What pants/shorts to wear
-3. Mid Layer - Any sweaters or extra warmth needed
-4. Outer Layer - Jackets or coats if needed
-5. Accessories - Hats, gloves, etc.
+Format each recommendation like this:
+👕 Base Layer: [recommendation]
+👖 Bottoms: [recommendation]
+🧥 Mid Layer: [recommendation] (if needed)
+🧥 Outer Layer: [recommendation] (if needed)
+🧤 Accessories: [recommendation]
+👟 Footwear: [recommendation]
 
-Important notes:
-- Add an appropriate emoji for each item
-- Keep it simple and clear - no technical temperature ranges
-- Only recommend layers that are actually needed for the weather
-- Consider both comfort and protection
-- If it's warm, you can skip layers that aren't needed
+Guidelines:
+• Start each item with an appropriate emoji
+• Use clear, everyday language
+• Only include layers needed for the weather
+• Focus on both comfort and weather protection
+• Keep descriptions concise but specific
+• If certain layers aren't needed, skip them
+• Consider both style and practicality
 
 Weather data:
 {json.dumps(weather_data, indent=2)}
@@ -143,7 +151,7 @@ Weather data:
 Safety considerations:
 {json.dumps(safety_recs, indent=2)}
 
-Please provide natural, friendly clothing recommendations:"""
+Provide recommendations in the exact format shown above, maintaining consistent emoji usage and formatting."""
 
         response = client.chat(
             model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}]
