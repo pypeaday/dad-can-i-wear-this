@@ -65,6 +65,7 @@ dependencies = [
     { name = "ollama" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
+    { name = "tomli" },
     { name = "uvicorn" },
 ]
 
@@ -76,6 +77,7 @@ requires-dist = [
     { name = "ollama", specifier = ">=0.4.7" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "python-multipart", specifier = "==0.0.9" },
+    { name = "tomli", specifier = "==2.0.1" },
     { name = "uvicorn", specifier = "==0.27.1" },
 ]
 
@@ -292,6 +294,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/be/47/1bba49d42d63f4453f0a64a20acbf2d0bd2f5a8cde6a166ee66c074a08f8/starlette-0.36.3.tar.gz", hash = "sha256:90a671733cfb35771d8cc605e0b679d23b992f8dcfad48cc60b38cb29aeb7080", size = 2842113 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/f7/372e3953b6e6fbfe0b70a1bb52612eae16e943f4288516480860fcd4ac41/starlette-0.36.3-py3-none-any.whl", hash = "sha256:13d429aa93a61dc40bf503e8c801db1f1bca3dc706b10ef2434a36123568f044", size = 71481 },
+]
+
+[[package]]
+name = "tomli"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/3f/d7af728f075fb08564c5949a9c95e44352e23dee646869fa104a3b2060a3/tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f", size = 15164 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/75/10a9ebee3fd790d20926a90a2547f0bf78f371b2f13aa822c759680ca7b9/tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc", size = 12757 },
 ]
 
 [[package]]
