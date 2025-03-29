@@ -9,6 +9,7 @@ import random
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import pandas as pd
 from .llm import get_clothing_recommendations, OLLAMA_MODEL
 from .__about__ import __version__
 
@@ -271,60 +272,130 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                 daytime_hours = set(range(5, 24))  # 5 AM to 11 PM
                 missing_hours = daytime_hours - hours_with_data
                 
-                # Get historical data for morning hours if we're missing them
-                # This provides actual data instead of interpolation
-                current_hour = now.hour
+                # Create a complete temperature dataset using pandas
+                print("\nCreating complete temperature dataset using pandas...")
                 
-                # Only fetch historical data if it's not early morning and we're missing data points
-                if missing_hours and current_hour > 5:
-                    print("\nFetching historical weather data for morning hours...")
+                # Convert forecast data to pandas DataFrame
+                df_data = []
+                for point in forecast:
+                    # Convert milliseconds to datetime
+                    time_dt = datetime.fromtimestamp(point["time"] / 1000, tz=ZoneInfo("America/New_York"))
+                    df_data.append({
+                        "time": time_dt,
+                        "hour": time_dt.hour,
+                        "temp": point["temp"],
+                        "feels_like": point["feels_like"],
+                        "description": point["description"]
+                    })
+                
+                # Create DataFrame
+                df = pd.DataFrame(df_data)
+                
+                # Print the data we have
+                print("\nExisting data points:")
+                for _, row in df.sort_values("hour").iterrows():
+                    print(f"  {row['hour']}:00 - {row['temp']}°F (feels like {row['feels_like']}°F)")
+                
+                # Get the full range of hours we want to display (5 AM to 11 PM)
+                all_hours = list(range(5, 24))
+                
+                # Find missing hours
+                existing_hours = df["hour"].unique()
+                missing_hours = [h for h in all_hours if h not in existing_hours]
+                print(f"\nMissing hours: {missing_hours}")
+                
+                # If we have missing hours, create a complete dataset with all hours
+                if missing_hours:
+                    # Create a new DataFrame with all hours
+                    all_hours_data = []
                     
-                    # Get timestamps for the morning hours we need
-                    morning_hours = [hour for hour in range(5, current_hour) if hour not in hours_with_data]
-                    
-                    # Fetch historical data for each missing hour
-                    for hour in morning_hours:
-                        try:
-                            # Create timestamp for this hour
-                            morning_time = datetime(today.year, today.month, today.day, hour, 0)
-                            morning_timestamp = int(morning_time.timestamp())
+                    for hour in all_hours:
+                        # If we have data for this hour, use it
+                        if hour in existing_hours:
+                            hour_data = df[df["hour"] == hour].iloc[0].to_dict()
+                            all_hours_data.append(hour_data)
+                        else:
+                            # Create a new timestamp for this hour
+                            time_dt = datetime(today.year, today.month, today.day, hour, 0, tzinfo=ZoneInfo("America/New_York"))
                             
-                            # Fetch historical data using the timemachine API
-                            historical_response = await client.get(
-                                "http://api.openweathermap.org/data/2.5/onecall/timemachine",
-                                params={
-                                    "lat": lat,
-                                    "lon": lon,
-                                    "dt": morning_timestamp,
-                                    "appid": OPENWEATHER_API_KEY,
-                                    "units": "imperial",
-                                },
-                            )
+                            # For morning hours (before current time), we need to estimate temperatures
+                            current_hour = now.hour
                             
-                            # Process the historical data
-                            if historical_response.status_code == 200:
-                                historical_data = historical_response.json()
-                                if "data" in historical_data and historical_data["data"]:
-                                    # Extract the data point
-                                    hist_point = historical_data["data"][0]
+                            if hour < current_hour:
+                                # Get the closest data points we have
+                                df_sorted = df.sort_values("hour")
+                                next_hour_idx = df_sorted[df_sorted["hour"] > hour].index.min() if any(df_sorted["hour"] > hour) else None
+                                
+                                if next_hour_idx is not None:
+                                    # We have a data point after this hour, use it as reference
+                                    next_hour_data = df.loc[next_hour_idx]
+                                    next_hour = next_hour_data["hour"]
+                                    next_temp = next_hour_data["temp"]
+                                    next_feels_like = next_hour_data["feels_like"]
                                     
-                                    # Create a data point from historical data
-                                    historical_point = {
-                                        "time": morning_timestamp * 1000,  # Convert to milliseconds
-                                        "temp": round(float(hist_point.get("temp", 0)), 1),
-                                        "feels_like": round(float(hist_point.get("feels_like", 0)), 1),
-                                        "description": hist_point.get("weather", [{}])[0].get("main", "Historical"),
-                                    }
+                                    # Morning temperatures are typically 5-15°F cooler than daytime
+                                    # Early morning (5-7 AM) is coolest, then gradually warms up
+                                    if hour < 7:
+                                        # Early morning: 12-15°F cooler than reference point
+                                        temp_diff = -15 + (hour - 5) * 1.5  # -15°F at 5 AM, -12°F at 7 AM
+                                    else:
+                                        # Later morning: gradually warming up to reference point
+                                        # Calculate how far we are between 7 AM and the reference point
+                                        hours_from_7am = hour - 7
+                                        hours_total = next_hour - 7
+                                        progress = hours_from_7am / hours_total if hours_total > 0 else 0
+                                        temp_diff = -12 * (1 - progress)  # Start at -12°F, approach 0 as we get closer to reference
                                     
-                                    # Add to forecast and track the hour
-                                    forecast.append(historical_point)
-                                    hours_with_data.add(hour)
-                                    print(f"  Added historical data for {hour}:00 AM: {historical_point['temp']}°F")
-                        except Exception as e:
-                            print(f"  Error fetching historical data for {hour}:00 AM: {e}")
+                                    # Calculate estimated temperatures
+                                    estimated_temp = round(next_temp + temp_diff, 1)
+                                    estimated_feels_like = round(next_feels_like + temp_diff * 1.1, 1)  # Feels even cooler
+                                    
+                                    print(f"  Estimating {hour}:00 AM: {estimated_temp}°F (reference: {next_hour}:00 at {next_temp}°F)")
+                                else:
+                                    # No later points, use the earliest point we have and make it cooler
+                                    earliest_data = df_sorted.iloc[0]
+                                    earliest_temp = earliest_data["temp"]
+                                    earliest_feels_like = earliest_data["feels_like"]
+                                    
+                                    # Make early morning 10-15°F cooler
+                                    temp_diff = -15 + (hour - 5) * 1.0 if hour >= 5 else -15
+                                    estimated_temp = round(earliest_temp + temp_diff, 1)
+                                    estimated_feels_like = round(earliest_feels_like + temp_diff * 1.1, 1)
+                                    
+                                    print(f"  Estimating {hour}:00 AM: {estimated_temp}°F (based on earliest data: {earliest_temp}°F)")
+                                
+                                # Add the estimated data point
+                                all_hours_data.append({
+                                    "time": time_dt,
+                                    "hour": hour,
+                                    "temp": estimated_temp,
+                                    "feels_like": estimated_feels_like,
+                                    "description": "Estimated"
+                                })
+                            else:
+                                # For future hours, we'll interpolate between existing points
+                                # This is handled by the chart.js library, so we'll skip these hours
+                                pass
                     
-                    # Re-sort forecast after adding historical points
-                    forecast.sort(key=lambda x: x["time"])
+                    # Create a new DataFrame with all hours
+                    if all_hours_data:
+                        complete_df = pd.DataFrame(all_hours_data)
+                        complete_df = complete_df.sort_values("hour")
+                        
+                        # Convert back to forecast format
+                        forecast = []
+                        for _, row in complete_df.iterrows():
+                            # Convert datetime to milliseconds timestamp
+                            timestamp_ms = int(row["time"].timestamp() * 1000)
+                            
+                            forecast.append({
+                                "time": timestamp_ms,
+                                "temp": row["temp"],
+                                "feels_like": row["feels_like"],
+                                "description": row["description"]
+                            })
+                        
+                        print("\nCreated complete temperature dataset with all hours")
                 
                 # Check for missing hours again after interpolation
                 if missing_hours:
