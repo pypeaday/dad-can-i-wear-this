@@ -14,6 +14,28 @@ A smart, mobile-first web application that helps answer weather-related clothing
 
 ## Setup
 
+### Option 1: Using Docker Compose (Recommended)
+
+1. Install Docker and Docker Compose on your system
+
+2. Copy the example environment file and update with your values:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Get an API key:
+   - Sign up for a free API key at [OpenWeatherMap](https://openweathermap.org/api)
+   - Add your API key and default ZIP code to `.env`
+
+4. Start the application using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+
+5. Visit http://localhost:8083 in your browser
+
+### Option 2: Using Python (Development)
+
 1. Create a virtual environment (do not commit to git):
    ```bash
    python -m venv .venv
@@ -41,15 +63,12 @@ A smart, mobile-first web application that helps answer weather-related clothing
    - Add your API key and default ZIP code to `.env`
    - Optionally configure Ollama settings in `.env`
 
-## Running the Application
+6. Run the application:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
 
-From the project root:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Visit http://localhost:8000 in your browser.
+7. Visit http://localhost:8000 in your browser
 
 ## Tech Stack
 
