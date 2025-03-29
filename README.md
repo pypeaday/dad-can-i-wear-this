@@ -1,6 +1,6 @@
 # Dad, Can I Wear This?
 
-A smart, mobile-first web application that helps answer weather-related clothing questions like "Do I need a coat?" or "Should I bring an umbrella?" Built with FastAPI, HTMX, and Ollama for AI-powered recommendations in a clean dark theme.
+A smart web application that helps answer weather-related clothing questions like "Do I need a coat?" or "Should I bring an umbrella?" Built with FastAPI, HTMX, and Ollama for AI-powered recommendations in a clean dark theme.
 
 ## Features
 
