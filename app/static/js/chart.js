@@ -1,16 +1,8 @@
 /**
  * Temperature Forecast Chart
- * Shows today's temperatures between 7 AM and 8 PM using OpenWeatherMap's 3-hour forecast API
+ * Shows today's temperatures with extended view to visualize trends
+ * Includes all available data points from the OpenWeatherMap API
  */
-
-// Initialize the chart when the DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Get forecast data from the window object (populated by the server)
-    const forecastData = window.forecastData || [];
-    
-    console.log('Initializing chart with data:', forecastData);
-    initializeChart(forecastData);
-});
 
 function initializeChart(forecastData) {
     const canvas = document.getElementById('forecastChart');
@@ -35,12 +27,14 @@ function initializeChart(forecastData) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    // Set time boundaries for today (7 AM to 8 PM)
+    // Set extended time boundaries to show more data
+    // Start from 5 AM to show early morning data
     const startTime = new Date(today);
-    startTime.setHours(7, 0, 0, 0);
+    startTime.setHours(5, 0, 0, 0);
     
+    // End at 11 PM to show evening forecast
     const endTime = new Date(today);
-    endTime.setHours(20, 0, 0, 0);
+    endTime.setHours(23, 0, 0, 0);
     
     // Convert forecast data timestamps to Date objects
     const points = forecastData.map(point => ({
@@ -117,8 +111,17 @@ function initializeChart(forecastData) {
                         },
                         ticks: {
                             color: 'rgba(255, 255, 255, 0.7)',
-                            maxRotation: 0
-                        }
+                            maxRotation: 0,
+                            autoSkip: false,
+                            callback: function(value, index, values) {
+                                // Show every 3 hours to avoid crowding
+                                const hour = new Date(value).getHours();
+                                return hour % 3 === 0 ? new Date(value).getHours() + ':00' : '';
+                            }
+                        },
+                        // Don't limit the x-axis to just the visible points
+                        min: startTime.getTime(),
+                        max: endTime.getTime()
                     },
                     y: {
                         min: minTemp,
@@ -146,6 +149,29 @@ function initializeChart(forecastData) {
                                     content: 'Current Time',
                                     position: 'start',
                                     backgroundColor: '#51cf66',
+                                    color: '#000000',
+                                    padding: 4
+                                }
+                            },
+                            morningBand: {
+                                type: 'box',
+                                xMin: (() => {
+                                    const morning = new Date(today);
+                                    morning.setHours(5, 0, 0, 0);
+                                    return morning;
+                                })(),
+                                xMax: (() => {
+                                    const morning = new Date(today);
+                                    morning.setHours(11, 59, 59, 999);
+                                    return morning;
+                                })(),
+                                backgroundColor: 'rgba(255, 220, 40, 0.1)',
+                                borderWidth: 0,
+                                label: {
+                                    display: true,
+                                    content: 'Morning',
+                                    position: 'start',
+                                    backgroundColor: 'rgba(255, 220, 40, 0.7)',
                                     color: '#000000',
                                     padding: 4
                                 }

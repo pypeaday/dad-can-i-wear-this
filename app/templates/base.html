@@ -16,48 +16,7 @@
     <!-- Load our chart initialization code -->
     <script src="/static/js/chart.js"></script>
     
-    <!-- Add HTMX event handlers -->
-    <script>
-        document.addEventListener('htmx:beforeRequest', function(evt) {
-            // Show loading modal
-            const modal = document.getElementById('loadingModal');
-            if (modal) modal.classList.add('active');
-        });
-
-        document.addEventListener('htmx:afterRequest', function(evt) {
-            // Hide loading modal
-            const modal = document.getElementById('loadingModal');
-            if (modal) modal.classList.remove('active');
-        });
-
-        document.addEventListener('htmx:responseError', function(evt) {
-            // Hide loading modal on error
-            const modal = document.getElementById('loadingModal');
-            if (modal) modal.classList.remove('active');
-            console.error('HTMX request error:', evt.detail);
-        });
-
-        // Handle Chart.js initialization after HTMX swaps
-        document.addEventListener('htmx:afterSwap', function(evt) {
-            // Give the DOM a moment to stabilize
-            setTimeout(function() {
-                const canvas = document.getElementById('forecastChart');
-                if (canvas) {
-                    const data = document.getElementById('forecast-data');
-                    if (data && data.value) {
-                        try {
-                            const forecast = JSON.parse(data.value);
-                            initializeChart(forecast);
-                        } catch (error) {
-                            console.error('Error initializing chart:', error);
-                        }
-                    }
-                }
-            }, 50);
-        });
-
-
-    </script>
+    <!-- HTMX event handlers moved to bottom of body -->
     <style>
         :root {
             --bg-primary: #1a1a1a;
@@ -245,8 +204,23 @@
     <div class="container">
         {% block content %}{% endblock %}
         
-        <!-- Version display -->
-        <div class="version-info">v{{ version }}</div>
+        <!-- Version and Model display -->
+        <div class="version-info">
+            <span class="version">v{{ version }}</span>
+            <span class="model">{{ model }}</span>
+        </div>
+
+        <style>
+            .version-info {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .version-info .model {
+                padding-left: 8px;
+                border-left: 1px solid var(--text-secondary);
+            }
+        </style>
     </div>
 
     <!-- Loading Modal -->
@@ -265,6 +239,7 @@
     </div>
 
     <script>
+        // Consolidated HTMX event handlers
         htmx.on('htmx:beforeRequest', function(evt) {
             const modal = document.getElementById('loadingModal');
             const stepText = document.getElementById('currentStep');
@@ -292,6 +267,26 @@
             const modal = document.getElementById('loadingModal');
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
+            console.error('HTMX request error:', evt.detail);
+        });
+
+        // Handle Chart.js initialization after HTMX swaps
+        htmx.on('htmx:afterSwap', function(evt) {
+            // Give the DOM a moment to stabilize
+            setTimeout(function() {
+                const canvas = document.getElementById('forecastChart');
+                if (canvas) {
+                    const data = document.getElementById('forecast-data');
+                    if (data && data.value) {
+                        try {
+                            const forecast = JSON.parse(data.value);
+                            initializeChart(forecast);
+                        } catch (error) {
+                            console.error('Error initializing chart:', error);
+                        }
+                    }
+                }
+            }, 50);
         });
     </script>
 </body>

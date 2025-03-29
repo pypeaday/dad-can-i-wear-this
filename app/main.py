@@ -1,19 +1,15 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.templating import _TemplateResponse
+from fastapi.responses import HTMLResponse
 import httpx
 from pathlib import Path
 import os
 import random
-import tomli
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from .llm import get_clothing_recommendations
-
-
+from .llm import get_clothing_recommendations, OLLAMA_MODEL
 from .__about__ import __version__
 
 # Load environment variables from the root .env file
@@ -36,7 +32,12 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 async def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "default_zip": DEFAULT_ZIP, "version": VERSION},
+        {
+            "request": request,
+            "default_zip": DEFAULT_ZIP,
+            "version": VERSION,
+            "model": OLLAMA_MODEL,
+        },
     )
 
 
@@ -172,17 +173,20 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             hours_with_data = set()
 
             # Always add current weather data (the chart will filter by time window)
-            forecast.append(
-                {
-                    "time": weather_data.get("dt", 0) * 1000,
-                    "temp": round(float(current_temp), 1),
-                    "feels_like": round(float(current_feels), 1),
-                    "description": weather_data.get("weather", [{}])[0].get(
-                        "main", "Unknown"
-                    ),
-                }
-            )
+            current_point = {
+                "time": weather_data.get("dt", 0) * 1000,
+                "temp": round(float(current_temp), 1),
+                "feels_like": round(float(current_feels), 1),
+                "description": weather_data.get("weather", [{}])[0].get(
+                    "main", "Unknown"
+                ),
+            }
+            forecast.append(current_point)
             print("[Added current conditions to data set]")
+            
+            # Add current hour to hours_with_data
+            current_hour = current_time.hour
+            hours_with_data.add(current_hour)
 
             print("\nProcessing forecast points (3-hour intervals):")
             for item in forecast_items:
@@ -196,15 +200,22 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                         timestamp, tz=ZoneInfo("America/New_York")
                     )
 
-                    # Include all points from today, even if they're in the past
-                    # This ensures we get all 3-hour intervals
-                    if forecast_time.date() == today:
-                        print(f"- {forecast_time.strftime('%I:%M %p')}: processing...")
+                    # Include all points from today and early tomorrow for better trend visualization
+                    # Also include points from late yesterday if available
+                    tomorrow = today + timedelta(days=1)
+                    yesterday = today - timedelta(days=1)
+                    
+                    # Accept data from yesterday evening through tomorrow morning
+                    if ((forecast_time.date() == yesterday and forecast_time.hour >= 18) or
+                        forecast_time.date() == today or
+                        (forecast_time.date() == tomorrow and forecast_time.hour <= 11)):
+                        print(f"- {forecast_time.strftime('%Y-%m-%d %I:%M %p')}: processing...")
                         # Track which hours we have data for
-                        hours_with_data.add(forecast_time.hour)
+                        if forecast_time.date() == today:
+                            hours_with_data.add(forecast_time.hour)
                     else:
                         print(
-                            f"- {forecast_time.strftime('%Y-%m-%d %I:%M %p')}: different day, skipping"
+                            f"- {forecast_time.strftime('%Y-%m-%d %I:%M %p')}: outside extended window, skipping"
                         )
                         continue
 
@@ -256,15 +267,72 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                 print("\nHours with forecast data:")
                 print(sorted(hours_with_data))
 
-                # Check for missing hours during daytime (7 AM to 8 PM)
-                daytime_hours = set(range(7, 21))  # 7 AM to 8 PM
+                # Check for missing hours during daytime (5 AM to 11 PM)
+                daytime_hours = set(range(5, 24))  # 5 AM to 11 PM
                 missing_hours = daytime_hours - hours_with_data
+                
+                # Get historical data for morning hours if we're missing them
+                # This provides actual data instead of interpolation
+                current_hour = now.hour
+                
+                # Only fetch historical data if it's not early morning and we're missing data points
+                if missing_hours and current_hour > 5:
+                    print("\nFetching historical weather data for morning hours...")
+                    
+                    # Get timestamps for the morning hours we need
+                    morning_hours = [hour for hour in range(5, current_hour) if hour not in hours_with_data]
+                    
+                    # Fetch historical data for each missing hour
+                    for hour in morning_hours:
+                        try:
+                            # Create timestamp for this hour
+                            morning_time = datetime(today.year, today.month, today.day, hour, 0)
+                            morning_timestamp = int(morning_time.timestamp())
+                            
+                            # Fetch historical data using the timemachine API
+                            historical_response = await client.get(
+                                "http://api.openweathermap.org/data/2.5/onecall/timemachine",
+                                params={
+                                    "lat": lat,
+                                    "lon": lon,
+                                    "dt": morning_timestamp,
+                                    "appid": OPENWEATHER_API_KEY,
+                                    "units": "imperial",
+                                },
+                            )
+                            
+                            # Process the historical data
+                            if historical_response.status_code == 200:
+                                historical_data = historical_response.json()
+                                if "data" in historical_data and historical_data["data"]:
+                                    # Extract the data point
+                                    hist_point = historical_data["data"][0]
+                                    
+                                    # Create a data point from historical data
+                                    historical_point = {
+                                        "time": morning_timestamp * 1000,  # Convert to milliseconds
+                                        "temp": round(float(hist_point.get("temp", 0)), 1),
+                                        "feels_like": round(float(hist_point.get("feels_like", 0)), 1),
+                                        "description": hist_point.get("weather", [{}])[0].get("main", "Historical"),
+                                    }
+                                    
+                                    # Add to forecast and track the hour
+                                    forecast.append(historical_point)
+                                    hours_with_data.add(hour)
+                                    print(f"  Added historical data for {hour}:00 AM: {historical_point['temp']}°F")
+                        except Exception as e:
+                            print(f"  Error fetching historical data for {hour}:00 AM: {e}")
+                    
+                    # Re-sort forecast after adding historical points
+                    forecast.sort(key=lambda x: x["time"])
+                
+                # Check for missing hours again after interpolation
                 if missing_hours:
                     print(
                         f"\nWARNING: Missing forecast data for hours: {sorted(missing_hours)}"
                     )
                 else:
-                    print("\nAll daytime hours (7 AM to 8 PM) have forecast data")
+                    print("\nAll daytime hours (5 AM to 11 PM) have forecast data")
 
         except Exception as e:
             print(f"Error fetching forecast data: {e}")
@@ -307,5 +375,6 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             "recommendations": clothing_recs,
             "forecast": forecast,
             "version": VERSION,
+            "model": OLLAMA_MODEL,
         },
     )
