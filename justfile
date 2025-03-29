@@ -1,18 +1,22 @@
+# Default registry if not set in environment
+REGISTRY := "docker.io/username"
+
 # Get current version
 get-version:
     hatch version
+
 # Build Docker image with version tag
 build:
     docker context use default
-    just get-version | xargs -I {} docker build -t registry.paynepride.com/dad-can-i-wear:{} .
-    docker tag registry.paynepride.com/dad-can-i-wear:$(just get-version) registry.paynepride.com/dad-can-i-wear:latest
+    just get-version | xargs -I {} docker build -t ${REGISTRY}/dad-can-i-wear:{} .
+    docker tag ${REGISTRY}/dad-can-i-wear:$(just get-version) ${REGISTRY}/dad-can-i-wear:latest
 
 # Push Docker image with version tag
 build-and-push:
     docker context use default
     just build
-    just get-version | xargs -I {} docker push registry.paynepride.com/dad-can-i-wear:{}
-    docker push registry.paynepride.com/dad-can-i-wear:latest
+    just get-version | xargs -I {} docker push ${REGISTRY}/dad-can-i-wear:{}
+    docker push ${REGISTRY}/dad-can-i-wear:latest
 
 # Release a new version (bump version, create release, build/push Docker)
 release type="patch":
