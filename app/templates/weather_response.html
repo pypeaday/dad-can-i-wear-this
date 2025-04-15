@@ -4,21 +4,35 @@
 <div id="weather-results" class="results-container">
     <!-- Weather Summary Card -->
     <div class="card summary-card">
-        <div class="weather-info">
+        <div class="weather-info" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div class="weather-stat">
-                <span class="stat-label">Temperature</span>
-                <span class="stat-value">{{ "%.1f"|format(temp) }}°F</span>
+                <span class="stat-label">Current</span>
+                <span class="stat-value" style="color: #43a047; font-weight: bold;">{{ temp|default('-') if temp is not none else '-' }}°F</span>
             </div>
             <div class="weather-stat">
-                <span class="stat-label">Wind Speed</span>
-                <span class="stat-value">{{ "%.1f"|format(wind_speed) }} MPH</span>
+                <span class="stat-label">Feels Like</span>
+                <span class="stat-value" style="color: #1976d2; font-weight: bold;">{{ feels_like|default('-') if feels_like is not none else '-' }}°F</span>
+            </div>
+            <div class="weather-stat">
+                <span class="stat-label">High</span>
+                <span class="stat-value" style="color: #e53935; font-weight: bold;">{{ temp_max|default('-') if temp_max is not none else '-' }}°F</span>
+            </div>
+            <div class="weather-stat">
+                <span class="stat-label">Low</span>
+                <span class="stat-value" style="color: #f06292; font-weight: bold;">{{ temp_min|default('-') if temp_min is not none else '-' }}°F</span>
+            </div>
+            <div class="weather-stat">
+                <span class="stat-label">Wind</span>
+                <span class="stat-value">
+                  {{ wind_speed|default('-') if wind_speed is not none else '-' }} MPH
+                </span>
             </div>
             <div class="weather-stat">
                 <span class="stat-label">Conditions</span>
                 <span class="stat-value">{{ conditions }}</span>
             </div>
         </div>
-        
+        <hr style="margin: 1rem 0;">
         <div class="weather-summary">
             {{ summary }}
         </div>
@@ -242,5 +256,21 @@
     <!-- Store forecast data -->
     <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
 </div>
+
+.wind-emoji {
+    margin-right: 0.15em;
+    display: inline-block;
+    animation: wind-emoji-move 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes wind-breeze {
+    0% { filter: blur(0px); }
+    50% { filter: blur(1px); letter-spacing: 2px; }
+    100% { filter: blur(0px); }
+}
+@keyframes wind-emoji-move {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(8px); }
+}
 </style>
 {% endblock %}

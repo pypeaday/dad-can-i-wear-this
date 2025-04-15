@@ -410,8 +410,17 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             forecast = []
 
     # Extract weather data
-    temp = weather_data["main"]["temp"]
-    feels_like = weather_data["main"]["feels_like"]
+    temp = round(weather_data["main"]["temp"])
+    feels_like = weather_data["main"].get("feels_like")
+    # Compute today's high/low from forecast
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    today_temps = [pt["temp"] for pt in forecast if datetime.fromtimestamp(pt["time"] / 1000, tz=ZoneInfo("America/New_York")).date() == today]
+    temp_max = round(max(today_temps)) if today_temps else temp
+    temp_min = round(min(today_temps)) if today_temps else temp
+    if feels_like is None:
+        feels_like = temp
+    else:
+        feels_like = round(feels_like)
     conditions = weather_data["weather"][0]["main"].lower()
     wind_speed = weather_data["wind"]["speed"]
 
@@ -439,6 +448,9 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
         {
             "request": request,
             "temp": temp,
+            "feels_like": feels_like,
+            "temp_max": temp_max,
+            "temp_min": temp_min,
             "wind_speed": wind_speed,
             "conditions": conditions.title(),
             "summary": summary,
