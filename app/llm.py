@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from ollama import Client
 import httpx
 from . import safety
+from .pydantic_ai_integration import validate_summary_ai, validate_recommendations_ai
 
 # Load environment variables from the root .env file
 root_dir = Path(__file__).resolve().parent.parent
@@ -115,6 +116,8 @@ async def get_clothing_recommendations(
     """
     # Get weather summary (AI-powered if available, basic if not)
     summary = get_weather_summary(weather_data)
+    # Validate summary with pydantic-ai
+    summary = await validate_summary_ai(weather_data, summary)
 
     # Get safety recommendations (these don't use LLM)
     safety_recs = safety.get_safety_recommendations(weather_data)
@@ -122,6 +125,8 @@ async def get_clothing_recommendations(
     # If Ollama isn't available, use standard recommendations
     if not ollama_available:
         clothing_recs = safety.get_standard_recommendations(weather_data)
+        # Validate recommendations with pydantic-ai
+        _, clothing_recs = await validate_recommendations_ai(weather_data, safety_recs, clothing_recs)
         return summary, safety_recs, clothing_recs
 
     try:
@@ -157,8 +162,16 @@ Provide recommendations in the exact format shown above, maintaining consistent 
             model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}]
         )
 
-        # Get standard recommendations as a base
-        standard_recs = safety.get_standard_recommendations(weather_data)
+        # Parse LLM output (basic split, could improve)
+        clothing_recs = [line.strip() for line in response['message']['content'].split('\n') if line.strip() and any(c in line for c in [':','Base Layer','Bottoms','Outer Layer','Accessories','Footwear'])]
+        # Validate recommendations with pydantic-ai
+        _, clothing_recs = await validate_recommendations_ai(weather_data, safety_recs, clothing_recs)
+        return summary, safety_recs, clothing_recs
+    except Exception as e:
+        print(f"Error getting AI-powered clothing recommendations: {e}")
+        clothing_recs = safety.get_standard_recommendations(weather_data)
+        _, clothing_recs = await validate_recommendations_ai(weather_data, safety_recs, clothing_recs)
+        return summary, safety_recs, clothing_recs
 
         # Get standard recommendations as a base set
         clothing_recs = standard_recs.copy()
