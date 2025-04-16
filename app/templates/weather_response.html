@@ -256,21 +256,4 @@
     <!-- Store forecast data -->
     <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
 </div>
-
-.wind-emoji {
-    margin-right: 0.15em;
-    display: inline-block;
-    animation: wind-emoji-move 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes wind-breeze {
-    0% { filter: blur(0px); }
-    50% { filter: blur(1px); letter-spacing: 2px; }
-    100% { filter: blur(0px); }
-}
-@keyframes wind-emoji-move {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(8px); }
-}
-</style>
 {% endblock %}
