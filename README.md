@@ -38,7 +38,7 @@ A smart web application that helps answer weather-related clothing questions lik
 
 1. Create a virtual environment (do not commit to git):
    ```bash
-   python -m venv .venv
+   uv venv
    ```
 
 2. Install Ollama:
@@ -55,7 +55,7 @@ A smart web application that helps answer weather-related clothing questions lik
 
 4. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 5. Get an API key:
