@@ -438,6 +438,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
         "humidity": weather_data["main"]["humidity"],
         "location": weather_data["name"],
         "description": weather_data["weather"][0]["description"],
+        "forecast": forecast,  # Add forecast data for time-specific summaries
     }
 
     # Get AI-powered summary and recommendations

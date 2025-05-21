@@ -6,9 +6,10 @@ services:
     volumes:
       - ./app:/app/app
     environment:
-      - OLLAMA_HOST=http://localhost:11434
-    # depends_on:
-    #   - ollama
+      - OLLAMA_HOST=http://babyblue-aurora:11434
+      - OLLAMA_TIMEOUT=10.0
+    extra_hosts:
+      - "babyblue-aurora:host-gateway"
     restart: unless-stopped
 
 #   ollama:

@@ -33,9 +33,23 @@
             </div>
         </div>
         <hr style="margin: 1rem 0;">
-        <div class="weather-summary">
-            {{ summary }}
+        <div class="weather-summary forecast-sections">
+            {{ summary|safe }}
         </div>
+        <style>
+            .forecast-sections h3 {
+                margin-top: 1rem;
+                margin-bottom: 0.5rem;
+                color: var(--accent);
+                font-size: 1.2rem;
+                font-weight: 600;
+            }
+            .forecast-sections p {
+                margin-bottom: 1rem;
+                line-height: 1.5;
+                font-size: 1.1rem;
+            }
+        </style>
     </div>
 
     <!-- Weather Warning Card for Wet Conditions -->

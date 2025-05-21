@@ -2,15 +2,23 @@ from pydantic import BaseModel, Field, validator
 from typing import List
 
 class WeatherSummary(BaseModel):
-    summary: str = Field(..., description="A paragraph summary of the weather conditions, suitable for kids.")
+    summary: str = Field(..., description="A summary of the weather conditions, suitable for kids. Can be a paragraph or HTML-formatted content with multiple sections.")
 
     @validator("summary")
-    def summary_is_paragraph(cls, v):
-        # Ensure summary is a paragraph (not a list, not too short)
-        if len(v.split()) < 12:
-            raise ValueError("Summary is too short; must be a full paragraph.")
-        if "\n" in v and v.count("\n") > 2:
-            raise ValueError("Summary should be a single paragraph, not a list.")
+    def validate_summary(cls, v):
+        # Check if this is HTML content
+        is_html = "<h3>" in v or "<p>" in v
+        
+        if is_html:
+            # For HTML content, just ensure it's not empty
+            if len(v.strip()) < 20:
+                raise ValueError("Summary is too short; must have meaningful content.")
+        else:
+            # For plain text, ensure it's a proper paragraph
+            if len(v.split()) < 12:
+                raise ValueError("Summary is too short; must be a full paragraph.")
+            if "\n" in v and v.count("\n") > 2:
+                raise ValueError("Summary should be a single paragraph, not a list.")
         return v
 
 class ClothingRecommendations(BaseModel):
