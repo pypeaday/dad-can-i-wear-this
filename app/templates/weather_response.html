@@ -38,6 +38,17 @@
         </div>
     </div>
 
+    <!-- Weather Warning Card for Wet Conditions -->
+    {% if conditions.lower() in ['rain', 'snow', 'drizzle', 'thunderstorm', 'sleet'] %}
+    <div class="card warning-card">
+        <h2>🌧️ Weather Warning</h2>
+        <div class="warning-message">
+            <strong>Wet conditions detected:</strong> {{ conditions }}
+            <p>Remember to bring appropriate rain gear and watch your step - surfaces may be slippery!</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Safety Alerts Card -->
     {% if safety_recommendations %}
     <div class="card safety-card">
