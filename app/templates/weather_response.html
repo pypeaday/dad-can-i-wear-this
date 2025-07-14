@@ -238,47 +238,168 @@
             gap: 0.5rem;
         }
 
-        /* Forecast section styles */
-        .forecast-card {
+        /* Practical Weather Essentials styles */
+        .practical-weather-card {
             padding: 1.5rem;
             background: var(--bg-primary);
         }
 
-        .forecast-subtitle {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-            text-align: center;
+        .practical-weather-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+            padding: 0.5rem;
         }
 
-        .forecast-chart-container {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            min-height: 400px;
+        .practical-stat {
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border-left: 4px solid var(--accent);
+            transition: all 0.3s ease;
         }
 
-        canvas#forecastChart {
-            width: 100% !important;
-            height: 100% !important;
-            max-height: 400px;
+        .practical-stat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .practical-icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .practical-info {
+            flex: 1;
+        }
+
+        .practical-title {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .practical-value {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        /* Status indicators */
+        .practical-stat.alert {
+            border-color: #ff5252;
+        }
+
+        .practical-stat.good {
+            border-color: #4caf50;
+        }
+
+        .practical-stat.temperature .practical-value {
+            font-weight: 600;
+            color: var(--accent);
         }
     </style>
 
-    <!-- Forecast Chart Card -->
-    <div class="card forecast-card">
-        <h2>📈 Today's Temperature Trend</h2>
-        <div class="forecast-subtitle">Extended view showing morning to evening forecast</div>
-        <div class="forecast-chart-container">
-            <canvas id="forecastChart"></canvas>
+    <!-- Parent-Focused Weather Card -->
+    <div class="card practical-weather-card">
+        <h2>📝 Today's Weather Essentials</h2>
+        <div class="practical-weather-container">
+            <!-- Temperature Summary -->
+            <div class="practical-stat temperature">
+                <div class="practical-icon">🌡️</div>
+                <div class="practical-info">
+                    <div class="practical-title">Temperature</div>
+                    <div class="practical-value">{{ temp|default('-') if temp is not none else '-' }}°F now, ranging from {{ temp_min|default('-') }}°F to {{ temp_max|default('-') }}°F</div>
+                </div>
+            </div>
+            
+            <!-- Rain/Umbrella -->
+            {% set needs_umbrella = conditions.lower() in ['rain', 'drizzle', 'thunderstorm'] or pop|default(0) >= 30 %}
+            <div class="practical-stat umbrella {% if needs_umbrella %}alert{% endif %}">
+                <div class="practical-icon">{{ '☔' if needs_umbrella else '🌂' }}</div>
+                <div class="practical-info">
+                    <div class="practical-title">Umbrella</div>
+                    <div class="practical-value">
+                        {% if needs_umbrella %}
+                            Yes, bring one today ({{ pop|default(0) }}% chance of rain)
+                        {% else %}
+                            Not needed today ({{ pop|default(0) }}% chance of rain)
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footwear -->
+            {% set wet_conditions = conditions.lower() in ['rain', 'snow', 'drizzle', 'thunderstorm', 'sleet'] %}
+            {% set hot_conditions = temp|default(0) > 80 %}
+            <div class="practical-stat footwear">
+                <div class="practical-icon">👞</div>
+                <div class="practical-info">
+                    <div class="practical-title">Footwear</div>
+                    <div class="practical-value">
+                        {% if wet_conditions %}
+                            Waterproof shoes recommended
+                        {% elif hot_conditions %}
+                            Sandals should be fine today
+                        {% else %}
+                            Regular shoes appropriate
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sun Protection -->
+            {% set sunny = conditions.lower() in ['clear', 'sunny'] or 'clear' in conditions.lower() %}
+            <div class="practical-stat sun {% if sunny %}alert{% endif %}">
+                <div class="practical-icon">☀️</div>
+                <div class="practical-info">
+                    <div class="practical-title">Sun Protection</div>
+                    <div class="practical-value">
+                        {% if sunny %}
+                            Sunscreen and hat recommended
+                        {% else %}
+                            Minimal sun protection needed
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Wind -->
+            {% set windy = wind_speed|default(0) > 15 %}
+            <div class="practical-stat wind {% if windy %}alert{% endif %}">
+                <div class="practical-icon">💨</div>
+                <div class="practical-info">
+                    <div class="practical-title">Wind</div>
+                    <div class="practical-value">
+                        {{ wind_speed|default('-') }} MPH - {{ "Windy, secure loose items" if windy else "Light breeze" }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Outdoor Activity -->
+            {% set good_for_outdoors = not wet_conditions and temp|default(0) > 50 and temp|default(0) < 95 and wind_speed|default(0) < 20 %}
+            <div class="practical-stat outdoor {% if good_for_outdoors %}good{% endif %}">
+                <div class="practical-icon">🏞️</div>
+                <div class="practical-info">
+                    <div class="practical-title">Outdoor Activities</div>
+                    <div class="practical-value">
+                        {% if good_for_outdoors %}
+                            Great day for outdoor play
+                        {% else %}
+                            Consider indoor alternatives
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
-    <!-- Store forecast data -->
+    <!-- Store forecast data (keeping this for potential future use) -->
     <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
 </div>
 {% endblock %}
