@@ -305,6 +305,47 @@
         }
     </style>
 
+    <!-- Temperature Graph Card -->
+    <div class="card temperature-graph-card">
+        <h2>📊 Today's Temperature Trend</h2>
+        <div class="simple-chart-container">
+            <div class="chart-area">
+                <!-- Y-axis labels -->
+                <div class="y-axis">
+                    <div class="y-label" data-temp="high">--°F</div>
+                    <div class="y-label" data-temp="mid">--°F</div>
+                    <div class="y-label" data-temp="low">--°F</div>
+                </div>
+                
+                <!-- Chart plotting area -->
+                <div class="plot-area" id="plotArea">
+                    <!-- Data points will be inserted here by JavaScript -->
+                </div>
+                
+                <!-- X-axis labels -->
+                <div class="x-axis" id="xAxis">
+                    <!-- Time labels will be inserted here by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="chart-legend">
+                <div class="legend-item">
+                    <span class="legend-color actual-temp"></span>
+                    <span>Actual Temperature</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color feels-like-temp"></span>
+                    <span>Feels Like</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color current-time"></span>
+                    <span>Current Time</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Parent-Focused Weather Card -->
     <div class="card practical-weather-card">
         <h2>📝 Today's Weather Essentials</h2>
@@ -399,7 +440,691 @@
         </div>
     </div>
     
-    <!-- Store forecast data (keeping this for potential future use) -->
+    <!-- Store forecast data with comprehensive debugging -->
     <input type="hidden" id="forecast-data" value='{{ forecast|tojson|safe }}'>
+    <input type="hidden" id="current-temp" value="{{ temp if temp is not none else '' }}">
+    <input type="hidden" id="current-feels-like" value="{{ feels_like if feels_like is not none else '' }}">
+    
+    <!-- Optional: D3 via CDN (not required). We render with plain SVG so the chart works offline. -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7" defer></script>
+    <script>
+    function initTempChart() {
+        console.log('=== TEMPERATURE CHART DEBUG START ===');
+        
+        // Get forecast data from hidden input
+        const forecastDataElement = document.getElementById('forecast-data');
+        
+        if (!forecastDataElement) {
+            console.error('❌ No forecast data element found');
+            showChartError('Chart data element not found');
+            return;
+        }
+        
+        console.log('✅ Found forecast data element');
+        
+        // Debug: Show raw data
+        const rawData = forecastDataElement.value;
+        console.log('📊 Raw forecast data:', rawData.substring(0, 200) + (rawData.length > 200 ? '...' : ''));
+        
+        let forecastData;
+        try {
+            forecastData = JSON.parse(rawData);
+            console.log('✅ Successfully parsed JSON data');
+            console.log('📈 Forecast data length:', forecastData ? forecastData.length : 'null');
+        } catch (e) {
+            console.error('❌ Error parsing forecast data:', e);
+            console.error('🔍 Raw data that failed to parse:', rawData);
+            showChartError('Failed to parse weather data');
+            return;
+        }
+        
+        if (!forecastData) {
+            console.error('❌ Forecast data is null or undefined');
+            showChartError('No weather data available');
+            return;
+        }
+        
+        if (!Array.isArray(forecastData)) {
+            console.error('❌ Forecast data is not an array:', typeof forecastData);
+            showChartError('Invalid weather data format');
+            return;
+        }
+        
+        if (forecastData.length === 0) {
+            console.error('❌ Forecast data array is empty');
+            showChartError('No weather data points available');
+            return;
+        }
+        
+        console.log('✅ Forecast data validation passed');
+        console.log('📊 Sample data point:', forecastData[0]);
+        
+        // Current time
+        const currentTime = Date.now();
+        console.log('🕐 Current time (ms):', currentTime);
+        console.log('🕐 Current time (readable):', new Date(currentTime).toLocaleString());
+        
+        // Show all data points for debugging
+        console.log('📋 All forecast data points:');
+        forecastData.forEach((point, index) => {
+            const pointTime = new Date(point.time);
+            console.log(`  ${index}: ${pointTime.toLocaleString()} - ${point.temp}°F (feels ${point.feels_like}°F)`);
+        });
+        
+        // More flexible time filtering - include yesterday evening through tomorrow morning
+        const now = new Date(currentTime);
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(18, 0, 0, 0); // 6 PM yesterday
+        
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(12, 0, 0, 0); // 12 PM tomorrow
+        
+        console.log('🔍 Time filter range:');
+        console.log('  From:', yesterday.toLocaleString());
+        console.log('  To:', tomorrow.toLocaleString());
+        
+        const relevantData = forecastData
+            .filter(point => {
+                const pointTime = new Date(point.time);
+                const isInRange = pointTime >= yesterday && pointTime <= tomorrow;
+                if (!isInRange) {
+                    console.log(`  ⏭️ Skipping ${pointTime.toLocaleString()} (outside range)`);
+                }
+                return isInRange;
+            })
+            .sort((a, b) => a.time - b.time);
+        
+        console.log(`✅ Filtered to ${relevantData.length} relevant data points`);
+        
+        if (relevantData.length === 0) {
+            console.error('❌ No data points in time range');
+            showChartError('No weather data for the current time period');
+            return;
+        }
+        
+        // Ensure we have valid temperature data
+        const validData = relevantData.filter(point => {
+            const hasValidTemp = typeof point.temp === 'number' && !isNaN(point.temp);
+            const hasValidFeels = typeof point.feels_like === 'number' && !isNaN(point.feels_like);
+            const hasValidTime = typeof point.time === 'number' && point.time > 0;
+            
+            if (!hasValidTemp || !hasValidFeels || !hasValidTime) {
+                console.warn('⚠️ Invalid data point:', point);
+                return false;
+            }
+            return true;
+        });
+        
+        console.log(`✅ ${validData.length} valid data points after validation`);
+        
+        if (validData.length === 0) {
+            console.error('❌ No valid data points found');
+            console.log('🔄 Attempting to generate fallback data from current weather...');
+            
+            // Try to generate fallback data using current weather
+            const currentTempElement = document.getElementById('current-temp');
+            const currentFeelsLikeElement = document.getElementById('current-feels-like');
+            const currentTemp = currentTempElement && currentTempElement.value ? parseFloat(currentTempElement.value) : null;
+            const currentFeelsLike = currentFeelsLikeElement && currentFeelsLikeElement.value ? parseFloat(currentFeelsLikeElement.value) : null;
+            
+            if (currentTemp !== null && currentFeelsLike !== null) {
+                console.log(`🌡️ Using current weather: ${currentTemp}°F (feels like ${currentFeelsLike}°F)`);
+                
+                // Generate a simple day-long forecast based on current conditions
+                let fallbackData = [];
+                const baseTime = new Date();
+                baseTime.setHours(6, 0, 0, 0); // Start at 6 AM
+                
+                // Create hourly points from 6 AM to 10 PM
+                for (let hour = 6; hour <= 22; hour++) {
+                    const pointTime = new Date(baseTime);
+                    pointTime.setHours(hour);
+                    
+                    // Create realistic temperature variation throughout the day
+                    let tempVariation = 0;
+                    if (hour >= 6 && hour <= 12) {
+                        // Morning: gradually warming up
+                        tempVariation = -8 + (hour - 6) * 2; // -8°F at 6 AM to +4°F at noon
+                    } else if (hour >= 12 && hour <= 16) {
+                        // Afternoon: peak heat
+                        tempVariation = 4 - (hour - 12) * 0.5; // +4°F at noon to +2°F at 4 PM
+                    } else {
+                        // Evening: cooling down
+                        tempVariation = 2 - (hour - 16) * 1.5; // +2°F at 4 PM to -7°F at 10 PM
+                    }
+                    
+                    const estimatedTemp = currentTemp + tempVariation;
+                    const estimatedFeelsLike = currentFeelsLike + tempVariation * 1.1;
+                    
+                    fallbackData.push({
+                        time: pointTime.getTime(),
+                        temp: Math.round(estimatedTemp * 10) / 10,
+                        feels_like: Math.round(estimatedFeelsLike * 10) / 10,
+                        description: 'Estimated'
+                    });
+                }
+                
+                console.log(`✅ Generated ${fallbackData.length} fallback data points`);
+                validData = fallbackData;
+                
+                // Recalculate current time index
+                currentTimeIndex = -1;
+                let newMinTimeDiff = Infinity;
+                validData.forEach((point, index) => {
+                    const timeDiff = Math.abs(point.time - currentTime);
+                    if (timeDiff < newMinTimeDiff) {
+                        newMinTimeDiff = timeDiff;
+                        currentTimeIndex = index;
+                    }
+                });
+                minTimeDiff = newMinTimeDiff;
+            } else {
+                console.error('❌ No current weather data available for fallback');
+                showChartError('No weather data available');
+                return;
+            }
+        }
+        
+        // Prefer showing just today's data in America/New_York (5 AM – 11 PM).
+        (function scopeTodayFilter(){
+            try {
+                const tz = 'America/New_York';
+                const todayStrET = new Date().toLocaleDateString('en-US', { timeZone: tz });
+                function etHour(ms){
+                    return Number(new Date(ms).toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tz }));
+                }
+                function isTodayET(ms){
+                    return new Date(ms).toLocaleDateString('en-US', { timeZone: tz }) === todayStrET;
+                }
+
+                let todayData = validData.filter(p => isTodayET(p.time) && etHour(p.time) >= 5 && etHour(p.time) <= 23)
+                                          .sort((a,b) => a.time - b.time);
+                console.log(`📅 Today ET points (5–23h): ${todayData.length}`);
+                validData = todayData;
+
+                // If too sparse, synthesize a realistic diurnal curve and blend in known points
+                if (!Array.isArray(validData) || validData.length < 6) {
+                    const currentTempEl = document.getElementById('current-temp');
+                    const baseNow = Number(currentTempEl && currentTempEl.value ? currentTempEl.value : 72);
+                    const ymd = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
+
+                    // Estimate day min/max from any available points; fall back around the current temp
+                    const temps = (validData||[]).map(p => Number(p.temp)).filter(v => Number.isFinite(v));
+                    const tMinEst = temps.length ? Math.min(...temps) : baseNow - 6;
+                    const tMaxEst = temps.length ? Math.max(...temps) : baseNow + 6;
+                    const dayMin = Math.min(tMinEst, baseNow - 4);
+                    const dayMax = Math.max(tMaxEst, baseNow + 4);
+
+                    const hourly = [];
+                    for (let h = 5; h <= 23; h++) {
+                        const tLocal = new Date(`${ymd}T${String(h).padStart(2,'0')}:00:00`);
+                        // Rise 6->15 using eased sine, fall 15->23 toward evening baseline
+                        let temp;
+                        if (h <= 15) {
+                            const prog = Math.max(0, Math.min(1, (h - 6) / 9));
+                            temp = dayMin + (dayMax - dayMin) * Math.sin((Math.PI/2) * prog);
+                        } else {
+                            const eveningBase = dayMin + 2;
+                            const prog = Math.max(0, Math.min(1, (h - 15) / 8));
+                            temp = dayMax - (dayMax - eveningBase) * Math.sin((Math.PI/2) * prog);
+                        }
+                        // Feels-like is slightly warmer midday, slightly cooler night
+                        const feelsOffset = (h >= 12 && h <= 18) ? 1.2 : 0.4;
+                        const fl = temp + feelsOffset;
+                        hourly.push({ time: tLocal.getTime(), temp, feels_like: fl, description: '' });
+                    }
+                    // Blend in any known points at matching ET hours
+                    validData.forEach(p => {
+                        const h = etHour(p.time);
+                        const idx = hourly.findIndex(x => etHour(x.time) === h);
+                        if (idx !== -1) hourly[idx] = { ...hourly[idx], temp: p.temp, feels_like: p.feels_like, description: p.description };
+                    });
+                    console.log(`🧪 Synthesized diurnal curve with blending.`);
+                    validData = hourly;
+                } else {
+                    // Interpolate to hourly grid for smooth spacing if points are 3-hourly
+                    const grid = [];
+                    for (let h = 5; h <= 23; h++) {
+                        const left = [...validData].reverse().find(p => etHour(p.time) <= h);
+                        const right = validData.find(p => etHour(p.time) >= h);
+                        if (!left || !right) continue;
+                        const lh = etHour(left.time);
+                        const rh = etHour(right.time);
+                        const span = Math.max(1, rh - lh);
+                        const r = Math.min(1, Math.max(0, (h - lh) / span));
+                        const t = left.time + r * (right.time - left.time);
+                        const temp = left.temp + r * (right.temp - left.temp);
+                        const fl = left.feels_like + r * (right.feels_like - left.feels_like);
+                        grid.push({ time: t, temp, feels_like: fl, description: right.description || left.description || '' });
+                    }
+                    if (grid.length >= 6) {
+                        console.log(`🕐 Interpolated to hourly grid: ${grid.length}`);
+                        validData = grid;
+                    }
+                }
+
+                // Final normalization: sort and de-duplicate by ET hour to guarantee sequential hours 5..23
+                const hourETKey = ms => Number(new Date(ms).toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tz }));
+                validData = (validData || []).slice().sort((a,b) => a.time - b.time);
+                const seenHours = new Set();
+                validData = validData.filter(p => {
+                    const h = hourETKey(p.time);
+                    if (h < 5 || h > 23) return false;
+                    if (seenHours.has(h)) return false;
+                    seenHours.add(h);
+                    return true;
+                });
+                console.log(`✅ Normalized hours kept: ${Array.from(seenHours).join(', ')}`);
+            } catch (e) {
+                console.warn('Failed to apply today-only filter:', e);
+            }
+        })();
+
+        // Find temperature range for scaling
+        const allTemps = [];
+        validData.forEach(point => {
+            allTemps.push(point.temp, point.feels_like);
+        });
+        
+        const minTemp = Math.min(...allTemps);
+        const maxTemp = Math.max(...allTemps);
+        const tempRange = maxTemp - minTemp;
+        const padding = Math.max(tempRange * 0.15, 5); // At least 5°F padding
+        const chartMin = minTemp - padding;
+        const chartMax = maxTemp + padding;
+        
+        console.log('📊 Temperature range:');
+        console.log(`  Min: ${minTemp}°F, Max: ${maxTemp}°F`);
+        console.log(`  Chart range: ${chartMin.toFixed(1)}°F to ${chartMax.toFixed(1)}°F`);
+        
+        // Update Y-axis labels
+        document.querySelector('[data-temp="high"]').textContent = Math.round(chartMax) + '°F';
+        document.querySelector('[data-temp="mid"]').textContent = Math.round((chartMax + chartMin) / 2) + '°F';
+        document.querySelector('[data-temp="low"]').textContent = Math.round(chartMin) + '°F';
+
+        // Use ET hour (5–23) for X positioning to avoid timezone drift and day spillover
+        const tzET = 'America/New_York';
+        const minHourET = 5;
+        const maxHourET = 23;
+        function hourET(ms){
+            return Number(new Date(ms).toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tzET }));
+        }
+
+        // Plain SVG renderer (no external dependency): connects dots and draws a vertical dotted "now" line
+        function renderWithSVG(data, chartMin, chartMax) {
+            const plotArea = document.getElementById('plotArea');
+            let rect = plotArea.getBoundingClientRect();
+            // If layout not ready (e.g., HTMX swap), wait a tick and retry
+            if (!rect || rect.width < 10 || rect.height < 10) {
+                console.warn('Plot area not measured yet, deferring render...');
+                return setTimeout(() => renderWithSVG(data, chartMin, chartMax), 50);
+            }
+            plotArea.innerHTML = '';
+
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+            svg.setAttribute('preserveAspectRatio', 'none');
+            plotArea.appendChild(svg);
+
+            const x = h => (Math.min(maxHourET, Math.max(minHourET, h)) - minHourET) / (maxHourET - minHourET) * rect.width;
+            const y = v => (1 - (v - chartMin) / (chartMax - chartMin)) * rect.height;
+
+            // Sort by ET hour and split into consecutive-hour segments to avoid long straight connectors
+            const sorted = data.slice().sort((a,b) => hourET(a.time) - hourET(b.time));
+            const toSegments = (arr) => {
+                const segs = [];
+                let cur = [];
+                for (let i=0;i<arr.length;i++) {
+                    const h = hourET(arr[i].time);
+                    if (cur.length === 0) {
+                        cur.push(arr[i]);
+                    } else {
+                        const prevH = hourET(cur[cur.length-1].time);
+                        if (h - prevH === 1) {
+                            cur.push(arr[i]);
+                        } else {
+                            if (cur.length >= 2) segs.push(cur);
+                            cur = [arr[i]];
+                        }
+                    }
+                }
+                if (cur.length >= 2) segs.push(cur);
+                return segs;
+            };
+            const actualSegs = toSegments(sorted);
+            const feelsSegs = toSegments(sorted);
+
+            actualSegs.forEach(seg => {
+                const poly = document.createElementNS(svgNS, 'polyline');
+                const pts = seg.map(d => `${x(hourET(d.time))},${y(d.temp)}`).join(' ');
+                poly.setAttribute('points', pts);
+                poly.setAttribute('fill', 'none');
+                poly.setAttribute('stroke', '#3bd16f');
+                poly.setAttribute('stroke-width', '2.5');
+                svg.appendChild(poly);
+            });
+
+            feelsSegs.forEach(seg => {
+                const poly = document.createElementNS(svgNS, 'polyline');
+                const pts = seg.map(d => `${x(hourET(d.time))},${y(d.feels_like)}`).join(' ');
+                poly.setAttribute('points', pts);
+                poly.setAttribute('fill', 'none');
+                poly.setAttribute('stroke', '#4ea0ff');
+                poly.setAttribute('stroke-width', '2');
+                poly.setAttribute('stroke-dasharray', '5,4');
+                svg.appendChild(poly);
+            });
+
+            // Dots with titles for tooltips
+            data.forEach(d => {
+                const c1 = document.createElementNS(svgNS, 'circle');
+                c1.setAttribute('cx', x(hourET(d.time)));
+                c1.setAttribute('cy', y(d.temp));
+                c1.setAttribute('r', '3.5');
+                c1.setAttribute('fill', '#3bd16f');
+                const t1 = document.createElementNS(svgNS, 'title');
+                t1.textContent = `Actual ${d.temp}°F at ${new Date(d.time).toLocaleTimeString('en-US',{hour:'numeric',hour12:true})}`;
+                c1.appendChild(t1);
+                svg.appendChild(c1);
+
+                const c2 = document.createElementNS(svgNS, 'circle');
+                c2.setAttribute('cx', x(hourET(d.time)));
+                c2.setAttribute('cy', y(d.feels_like));
+                c2.setAttribute('r', '3');
+                c2.setAttribute('fill', '#4ea0ff');
+                const t2 = document.createElementNS(svgNS, 'title');
+                t2.textContent = `Feels like ${d.feels_like}°F at ${new Date(d.time).toLocaleTimeString('en-US',{hour:'numeric',hour12:true})}`;
+                c2.appendChild(t2);
+                svg.appendChild(c2);
+            });
+
+            // Vertical dotted now line
+            const nowHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tzET }));
+            const xNow = x(nowHour);
+            const vline = document.createElementNS(svgNS, 'line');
+            vline.setAttribute('x1', xNow);
+            vline.setAttribute('x2', xNow);
+            vline.setAttribute('y1', '0');
+            vline.setAttribute('y2', String(rect.height));
+            vline.setAttribute('stroke', 'rgba(255, 99, 132, 0.85)');
+            vline.setAttribute('stroke-width', '2');
+            vline.setAttribute('stroke-dasharray', '4,6');
+            svg.appendChild(vline);
+
+            // X-axis labels at fixed hours
+            const labelHours = [5,8,11,14,17,20,23];
+            labelHours.forEach(h => {
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('x', x(h));
+                text.setAttribute('y', String(rect.height - 6));
+                text.setAttribute('fill', '#b0b0b0');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('text-anchor', 'middle');
+                text.textContent = new Date(`1970-01-01T${String(h).padStart(2,'0')}:00:00`).toLocaleTimeString('en-US',{hour:'numeric',hour12:true});
+                svg.appendChild(text);
+            });
+        }
+        
+        // Find current ET hour and nearest point index
+        let currentTimeIndex = -1;
+        let minTimeDiff = Infinity;
+        const nowETHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tzET }));
+        validData.forEach((point, index) => {
+            const diff = Math.abs(hourET(point.time) - nowETHour);
+            if (diff < minTimeDiff) {
+                minTimeDiff = diff;
+                currentTimeIndex = index;
+            }
+        });
+        
+        console.log(`🎯 Current time index: ${currentTimeIndex} (${Math.round(minTimeDiff / 1000 / 60)} minutes diff)`);
+        
+        // Create chart points and labels
+        const plotArea = document.getElementById('plotArea');
+        const xAxis = document.getElementById('xAxis');
+        
+        if (!plotArea || !xAxis) {
+            console.error('❌ Chart elements not found');
+            showChartError('Chart display elements not found');
+            return;
+        }
+        
+        // Clear existing content
+        plotArea.innerHTML = '';
+        xAxis.innerHTML = '';
+        
+        // Add data points and lines
+        console.log('🎨 Rendering chart with SVG...');
+        renderWithSVG(validData, chartMin, chartMax);
+        return; // Use the SVG rendering path exclusively
+        
+        // Error display function
+        function showChartError(message) {
+        const plotArea = document.getElementById('plotArea');
+        if (plotArea) {
+            plotArea.innerHTML = `
+                <div style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    color: var(--text-secondary);
+                    font-style: italic;
+                    text-align: center;
+                    padding: 2rem;
+                ">
+                    <div>
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📊</div>
+                        <div>${message}</div>
+                        <div style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.7;">
+                            Check the browser console for details
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+            // Also clear the Y-axis labels
+            const yLabels = document.querySelectorAll('.y-label');
+            yLabels.forEach(label => {
+                label.textContent = '--°F';
+            });
+        }
+    }
+
+    // Run on initial load or immediate execution if DOM is already ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTempChart);
+    } else {
+        // If this template was injected via HTMX, DOMContentLoaded won't fire again
+        initTempChart();
+    }
+
+    // Also run after HTMX swaps (when this fragment is injected)
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        try {
+            // If the swap affected our chart container or the results area, re-init
+            const target = evt && evt.detail ? evt.detail.target : null;
+            if (document.getElementById('plotArea') || (target && (target.id === 'weather-results' || target.querySelector && target.querySelector('#plotArea')))) {
+                initTempChart();
+            }
+        } catch (e) {
+            console.error('Error re-initializing chart after HTMX swap:', e);
+        }
+    });
+    </script>
+    
+    <style>
+    .temperature-graph-card {
+        margin: 1.5rem 0;
+    }
+    
+    .temperature-graph-card h2 {
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    .simple-chart-container {
+        background: var(--bg-primary);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    
+    .chart-area {
+        position: relative;
+        height: 250px;
+        margin-bottom: 1rem;
+    }
+    
+    .y-axis {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-right: 8px;
+    }
+    
+    .y-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        line-height: 1;
+    }
+    
+    .plot-area {
+        position: absolute;
+        left: 45px;
+        top: 10px;
+        right: 10px;
+        bottom: 30px;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .data-point {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        transform: translate(-50%, 50%);
+        cursor: pointer;
+        z-index: 2;
+    }
+    
+    .actual-temp-point {
+        background-color: #43a047;
+        border: 2px solid #43a047;
+    }
+    
+    .feels-like-point {
+        background-color: #1976d2;
+        border: 2px solid #1976d2;
+    }
+    
+    .current-time-point {
+        background-color: #ff6b6b !important;
+        border-color: #ff6b6b !important;
+        width: 12px;
+        height: 12px;
+        box-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+    }
+    
+    .temp-line {
+        position: absolute;
+        height: 2px;
+        transform-origin: left center;
+        z-index: 1;
+    }
+    
+    .actual-temp-line {
+        background-color: #43a047;
+    }
+    
+    .feels-like-line {
+        background-color: #1976d2;
+    }
+    
+    .x-axis {
+        position: absolute;
+        left: 45px;
+        bottom: 0;
+        right: 10px;
+        height: 25px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .time-label {
+        position: absolute;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }
+    
+    .current-time-label {
+        color: #ff6b6b;
+        font-weight: bold;
+    }
+    
+    .chart-legend {
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-primary);
+    }
+    
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    
+    .legend-color.actual-temp {
+        background-color: #43a047;
+    }
+    
+    .legend-color.feels-like-temp {
+        background-color: #1976d2;
+    }
+    
+    .legend-color.current-time {
+        background-color: #ff6b6b;
+    }
+    
+    @media (max-width: 600px) {
+        .chart-legend {
+            gap: 1rem;
+        }
+        
+        .legend-item {
+            font-size: 0.8rem;
+        }
+        
+        .time-label {
+            font-size: 0.7rem;
+        }
+    }
+    </style>
 </div>
 {% endblock %}

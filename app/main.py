@@ -64,7 +64,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             ):
                 print("Invalid coordinates in weather data")
                 forecast = []
-                return
+                raise Exception("Missing/invalid coords in current weather")
 
             try:
                 lat = float(weather_data["coord"]["lat"])
@@ -72,7 +72,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             except (KeyError, ValueError, TypeError) as e:
                 print(f"Error parsing coordinates: {e}")
                 forecast = []
-                return
+                raise Exception("Failed to parse coords")
 
             # Fetch forecast data using 5-day/3-hour forecast API
             forecast_response = await client.get(
@@ -93,19 +93,19 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             if forecast_response.status_code != 200:
                 print(f"Forecast API error: {forecast_response.status_code}")
                 forecast = []
-                return
+                raise Exception("Forecast API non-200")
 
             try:
                 forecast_data = forecast_response.json()
             except Exception as e:
                 print(f"Error parsing forecast response: {e}")
                 forecast = []
-                return
+                raise Exception("Failed to parse forecast JSON")
 
             if not isinstance(forecast_data, dict) or "list" not in forecast_data:
                 print("Invalid forecast data format")
                 forecast = []
-                return
+                raise Exception("Invalid forecast data format")
 
             # Process forecast data
             forecast = []
@@ -114,7 +114,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             if not forecast_items:
                 print("Empty forecast list")
                 forecast = []
-                return
+                raise Exception("Empty forecast list")
 
             # Get current time and date in ET
             now = datetime.now(ZoneInfo("America/New_York"))
@@ -173,6 +173,9 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             # Track all hours we have data for (to detect gaps)
             hours_with_data = set()
 
+            # Track precipitation probability (max for today)
+            max_pop_pct = 0
+
             # Always add current weather data (the chart will filter by time window)
             current_point = {
                 "time": weather_data.get("dt", 0) * 1000,
@@ -214,6 +217,13 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                         # Track which hours we have data for
                         if forecast_time.date() == today:
                             hours_with_data.add(forecast_time.hour)
+                            # Track precipitation probability for today (if present on item)
+                            try:
+                                pop = float(item.get("pop", 0.0))
+                                if 0.0 <= pop <= 1.0:
+                                    max_pop_pct = max(max_pop_pct, int(round(pop * 100)))
+                            except Exception:
+                                pass
                     else:
                         print(
                             f"- {forecast_time.strftime('%Y-%m-%d %I:%M %p')}: outside extended window, skipping"
@@ -396,7 +406,7 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
                             })
                         
                         print("\nCreated complete temperature dataset with all hours")
-                
+
                 # Check for missing hours again after interpolation
                 if missing_hours:
                     print(
@@ -408,6 +418,8 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
         except Exception as e:
             print(f"Error fetching forecast data: {e}")
             forecast = []
+            # Ensure precipitation probability has a default
+            max_pop_pct = 0
 
     # Extract weather data
     temp = round(weather_data["main"]["temp"])
@@ -458,6 +470,8 @@ async def get_weather(request: Request, zip_code: str = Form(...)):
             "safety_recommendations": safety_recs,
             "recommendations": clothing_recs,
             "forecast": forecast,
+            # Precipitation probability percentage for umbrella logic
+            "pop": max_pop_pct,
             "version": VERSION,
             "model": OLLAMA_MODEL,
         },
