@@ -799,10 +799,35 @@
             const actualSegs = toSegments(sorted);
             const feelsSegs = toSegments(sorted);
 
+            // Helper: upsample each consecutive-hour segment to 15‑minute increments via linear interpolation
+            const upsampleSegment = (seg, valueSelector) => {
+                if (!seg || seg.length < 2) return [];
+                const out = [];
+                for (let i = 0; i < seg.length - 1; i++) {
+                    const a = seg[i];
+                    const b = seg[i + 1];
+                    const ha = hourET(a.time);
+                    const hb = hourET(b.time);
+                    // Only process consecutive hours (we already split like this), subdivide into 15‑minute steps
+                    const steps = 4; // 0, 15, 30, 45, 60 min
+                    for (let s = 0; s < steps; s++) {
+                        const t = s / steps; // 0..0.75
+                        const h = ha + t;
+                        const v = (1 - t) * valueSelector(a) + t * valueSelector(b);
+                        out.push({ x: x(h), y: y(v) });
+                    }
+                }
+                // push the last endpoint exactly
+                const last = seg[seg.length - 1];
+                out.push({ x: x(hourET(last.time)), y: y(valueSelector(last)) });
+                return out;
+            };
+
             actualSegs.forEach(seg => {
+                const pts = upsampleSegment(seg, d => d.temp);
+                if (pts.length < 2) return;
                 const poly = document.createElementNS(svgNS, 'polyline');
-                const pts = seg.map(d => `${x(hourET(d.time))},${y(d.temp)}`).join(' ');
-                poly.setAttribute('points', pts);
+                poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
                 poly.setAttribute('fill', 'none');
                 poly.setAttribute('stroke', '#3bd16f');
                 poly.setAttribute('stroke-width', '2.5');
@@ -810,9 +835,10 @@
             });
 
             feelsSegs.forEach(seg => {
+                const pts = upsampleSegment(seg, d => d.feels_like);
+                if (pts.length < 2) return;
                 const poly = document.createElementNS(svgNS, 'polyline');
-                const pts = seg.map(d => `${x(hourET(d.time))},${y(d.feels_like)}`).join(' ');
-                poly.setAttribute('points', pts);
+                poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
                 poly.setAttribute('fill', 'none');
                 poly.setAttribute('stroke', '#4ea0ff');
                 poly.setAttribute('stroke-width', '2');
