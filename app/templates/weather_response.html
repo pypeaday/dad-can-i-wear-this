@@ -774,112 +774,242 @@
             const x = h => (Math.min(maxHourET, Math.max(minHourET, h)) - minHourET) / (maxHourET - minHourET) * rect.width;
             const y = v => (1 - (v - chartMin) / (chartMax - chartMin)) * rect.height;
 
-            // Sort by ET hour and split into consecutive-hour segments to avoid long straight connectors
+            // Sort data by ET hour for continuous curve rendering
             const sorted = data.slice().sort((a,b) => hourET(a.time) - hourET(b.time));
-            const toSegments = (arr) => {
-                const segs = [];
-                let cur = [];
-                for (let i=0;i<arr.length;i++) {
-                    const h = hourET(arr[i].time);
-                    if (cur.length === 0) {
-                        cur.push(arr[i]);
-                    } else {
-                        const prevH = hourET(cur[cur.length-1].time);
-                        if (h - prevH === 1) {
-                            cur.push(arr[i]);
-                        } else {
-                            if (cur.length >= 2) segs.push(cur);
-                            cur = [arr[i]];
-                        }
-                    }
+
+            // Advanced smooth curve generation using Catmull-Rom spline interpolation
+            const generateSmoothCurve = (seg, valueSelector, tension = 0.4, smoothing = 0.3) => {
+                if (!seg || seg.length < 2) return '';
+                
+                // Convert data points to coordinates
+                const points = seg.map(d => ({
+                    x: x(hourET(d.time)),
+                    y: y(valueSelector(d))
+                }));
+                
+                if (points.length === 2) {
+                    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
                 }
-                if (cur.length >= 2) segs.push(cur);
-                return segs;
-            };
-            const actualSegs = toSegments(sorted);
-            const feelsSegs = toSegments(sorted);
 
-            // Helper: upsample each consecutive-hour segment to 15‑minute increments via linear interpolation
-            const upsampleSegment = (seg, valueSelector) => {
-                if (!seg || seg.length < 2) return [];
-                const out = [];
-                for (let i = 0; i < seg.length - 1; i++) {
-                    const a = seg[i];
-                    const b = seg[i + 1];
-                    const ha = hourET(a.time);
-                    const hb = hourET(b.time);
-                    // Only process consecutive hours (we already split like this), subdivide into 15‑minute steps
-                    const steps = 4; // 0, 15, 30, 45, 60 min
-                    for (let s = 0; s < steps; s++) {
-                        const t = s / steps; // 0..0.75
-                        const h = ha + t;
-                        const v = (1 - t) * valueSelector(a) + t * valueSelector(b);
-                        out.push({ x: x(h), y: y(v) });
-                    }
+                // Calculate control points using Catmull-Rom spline approach
+                const getControlPoints = (p0, p1, p2, p3) => {
+                    const d01 = Math.sqrt(Math.pow(p1.x - p0.x, 2) + Math.pow(p1.y - p0.y, 2));
+                    const d12 = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+                    const d23 = Math.sqrt(Math.pow(p3.x - p2.x, 2) + Math.pow(p3.y - p2.y, 2));
+
+                    const alpha = 0.5; // Catmull-Rom alpha parameter
+                    
+                    const t01 = Math.pow(d01, alpha);
+                    const t12 = Math.pow(d12, alpha);
+                    const t23 = Math.pow(d23, alpha);
+
+                    const m1x = (1 - tension) * (p2.x - p0.x) / (t01 + t12);
+                    const m1y = (1 - tension) * (p2.y - p0.y) / (t01 + t12);
+                    const m2x = (1 - tension) * (p3.x - p1.x) / (t12 + t23);
+                    const m2y = (1 - tension) * (p3.y - p1.y) / (t12 + t23);
+
+                    const cp1x = p1.x + smoothing * t12 * m1x;
+                    const cp1y = p1.y + smoothing * t12 * m1y;
+                    const cp2x = p2.x - smoothing * t12 * m2x;
+                    const cp2y = p2.y - smoothing * t12 * m2y;
+
+                    return { cp1: { x: cp1x, y: cp1y }, cp2: { x: cp2x, y: cp2y } };
+                };
+
+                let path = `M ${points[0].x} ${points[0].y}`;
+
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p0 = points[Math.max(0, i - 1)];
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+                    const { cp1, cp2 } = getControlPoints(p0, p1, p2, p3);
+                    path += ` C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`;
                 }
-                // push the last endpoint exactly
-                const last = seg[seg.length - 1];
-                out.push({ x: x(hourET(last.time)), y: y(valueSelector(last)) });
-                return out;
+
+                return path;
             };
 
-            actualSegs.forEach(seg => {
-                const pts = upsampleSegment(seg, d => d.temp);
-                if (pts.length < 2) return;
-                const poly = document.createElementNS(svgNS, 'polyline');
-                poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
-                poly.setAttribute('fill', 'none');
-                poly.setAttribute('stroke', '#3bd16f');
-                poly.setAttribute('stroke-width', '2.5');
-                svg.appendChild(poly);
-            });
+            // Add gradient definitions for enhanced visual effects
+            const defs = document.createElementNS(svgNS, 'defs');
+            
+            // Actual temperature gradient
+            const actualGradient = document.createElementNS(svgNS, 'linearGradient');
+            actualGradient.setAttribute('id', 'actualTempGradient');
+            actualGradient.setAttribute('x1', '0%');
+            actualGradient.setAttribute('y1', '0%');
+            actualGradient.setAttribute('x2', '100%');
+            actualGradient.setAttribute('y2', '0%');
+            
+            const actualStop1 = document.createElementNS(svgNS, 'stop');
+            actualStop1.setAttribute('offset', '0%');
+            actualStop1.setAttribute('stop-color', '#43a047');
+            
+            const actualStop2 = document.createElementNS(svgNS, 'stop');
+            actualStop2.setAttribute('offset', '100%');
+            actualStop2.setAttribute('stop-color', '#66bb6a');
+            
+            actualGradient.appendChild(actualStop1);
+            actualGradient.appendChild(actualStop2);
+            defs.appendChild(actualGradient);
 
-            feelsSegs.forEach(seg => {
-                const pts = upsampleSegment(seg, d => d.feels_like);
-                if (pts.length < 2) return;
-                const poly = document.createElementNS(svgNS, 'polyline');
-                poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
-                poly.setAttribute('fill', 'none');
-                poly.setAttribute('stroke', '#4ea0ff');
-                poly.setAttribute('stroke-width', '2');
-                poly.setAttribute('stroke-dasharray', '5,4');
-                svg.appendChild(poly);
-            });
+            // Feels like gradient
+            const feelsGradient = document.createElementNS(svgNS, 'linearGradient');
+            feelsGradient.setAttribute('id', 'feelsLikeGradient');
+            feelsGradient.setAttribute('x1', '0%');
+            feelsGradient.setAttribute('y1', '0%');
+            feelsGradient.setAttribute('x2', '100%');
+            feelsGradient.setAttribute('y2', '0%');
+            
+            const feelsStop1 = document.createElementNS(svgNS, 'stop');
+            feelsStop1.setAttribute('offset', '0%');
+            feelsStop1.setAttribute('stop-color', '#1976d2');
+            
+            const feelsStop2 = document.createElementNS(svgNS, 'stop');
+            feelsStop2.setAttribute('offset', '100%');
+            feelsStop2.setAttribute('stop-color', '#42a5f5');
+            
+            feelsGradient.appendChild(feelsStop1);
+            feelsGradient.appendChild(feelsStop2);
+            defs.appendChild(feelsGradient);
 
-            // Dots with titles for tooltips
+            svg.appendChild(defs);
+
+            // Render single continuous smooth curve for actual temperature
+            const actualPathData = generateSmoothCurve(sorted, d => d.temp);
+            if (actualPathData) {
+                const actualPath = document.createElementNS(svgNS, 'path');
+                actualPath.setAttribute('d', actualPathData);
+                actualPath.setAttribute('fill', 'none');
+                actualPath.setAttribute('stroke', 'url(#actualTempGradient)');
+                actualPath.setAttribute('stroke-width', '4');
+                actualPath.setAttribute('stroke-linecap', 'round');
+                actualPath.setAttribute('stroke-linejoin', 'round');
+                actualPath.setAttribute('filter', 'drop-shadow(0 2px 4px rgba(67, 160, 71, 0.3))');
+                svg.appendChild(actualPath);
+            }
+
+            // Render single continuous smooth curve for feels-like temperature
+            const feelsPathData = generateSmoothCurve(sorted, d => d.feels_like);
+            if (feelsPathData) {
+                const feelsPath = document.createElementNS(svgNS, 'path');
+                feelsPath.setAttribute('d', feelsPathData);
+                feelsPath.setAttribute('fill', 'none');
+                feelsPath.setAttribute('stroke', 'url(#feelsLikeGradient)');
+                feelsPath.setAttribute('stroke-width', '3');
+                feelsPath.setAttribute('stroke-dasharray', '10,5');
+                feelsPath.setAttribute('stroke-linecap', 'round');
+                feelsPath.setAttribute('stroke-linejoin', 'round');
+                feelsPath.setAttribute('filter', 'drop-shadow(0 2px 4px rgba(25, 118, 210, 0.3))');
+                svg.appendChild(feelsPath);
+            }
+
+            // Enhanced data points with glow effects for smooth appearance
             data.forEach(d => {
+                const hour = hourET(d.time);
+                const px = x(hour);
+                
+                // Actual temperature point with subtle glow
+                const c1Glow = document.createElementNS(svgNS, 'circle');
+                c1Glow.setAttribute('cx', px);
+                c1Glow.setAttribute('cy', y(d.temp));
+                c1Glow.setAttribute('r', '8');
+                c1Glow.setAttribute('fill', '#43a047');
+                c1Glow.setAttribute('opacity', '0.2');
+                svg.appendChild(c1Glow);
+                
                 const c1 = document.createElementNS(svgNS, 'circle');
-                c1.setAttribute('cx', x(hourET(d.time)));
+                c1.setAttribute('cx', px);
                 c1.setAttribute('cy', y(d.temp));
-                c1.setAttribute('r', '3.5');
-                c1.setAttribute('fill', '#3bd16f');
+                c1.setAttribute('r', '5');
+                c1.setAttribute('fill', '#43a047');
+                c1.setAttribute('stroke', '#ffffff');
+                c1.setAttribute('stroke-width', '2');
+                c1.style.cursor = 'pointer';
                 const t1 = document.createElementNS(svgNS, 'title');
-                t1.textContent = `Actual ${d.temp}°F at ${new Date(d.time).toLocaleTimeString('en-US',{hour:'numeric',hour12:true})}`;
+                t1.textContent = `${d.temp}°F at ${new Date(d.time).toLocaleTimeString('en-US',{hour:'numeric',hour12:true})}`;
                 c1.appendChild(t1);
                 svg.appendChild(c1);
 
+                // Feels-like temperature point with subtle glow
+                const c2Glow = document.createElementNS(svgNS, 'circle');
+                c2Glow.setAttribute('cx', px);
+                c2Glow.setAttribute('cy', y(d.feels_like));
+                c2Glow.setAttribute('r', '7');
+                c2Glow.setAttribute('fill', '#1976d2');
+                c2Glow.setAttribute('opacity', '0.2');
+                svg.appendChild(c2Glow);
+                
                 const c2 = document.createElementNS(svgNS, 'circle');
-                c2.setAttribute('cx', x(hourET(d.time)));
+                c2.setAttribute('cx', px);
                 c2.setAttribute('cy', y(d.feels_like));
-                c2.setAttribute('r', '3');
-                c2.setAttribute('fill', '#4ea0ff');
+                c2.setAttribute('r', '4');
+                c2.setAttribute('fill', '#1976d2');
+                c2.setAttribute('stroke', '#ffffff');
+                c2.setAttribute('stroke-width', '2');
+                c2.style.cursor = 'pointer';
                 const t2 = document.createElementNS(svgNS, 'title');
                 t2.textContent = `Feels like ${d.feels_like}°F at ${new Date(d.time).toLocaleTimeString('en-US',{hour:'numeric',hour12:true})}`;
                 c2.appendChild(t2);
                 svg.appendChild(c2);
             });
 
-            // Vertical dotted now line
+            // Add gradient for current time line to existing defs
+            const timeGradient = document.createElementNS(svgNS, 'linearGradient');
+            timeGradient.setAttribute('id', 'timeLineGradient');
+            timeGradient.setAttribute('x1', '0%');
+            timeGradient.setAttribute('y1', '0%');
+            timeGradient.setAttribute('x2', '0%');
+            timeGradient.setAttribute('y2', '100%');
+            
+            const stop1 = document.createElementNS(svgNS, 'stop');
+            stop1.setAttribute('offset', '0%');
+            stop1.setAttribute('stop-color', '#ff6b6b');
+            stop1.setAttribute('stop-opacity', '0.8');
+            
+            const stop2 = document.createElementNS(svgNS, 'stop');
+            stop2.setAttribute('offset', '50%');
+            stop2.setAttribute('stop-color', '#ff6b6b');
+            stop2.setAttribute('stop-opacity', '1');
+            
+            const stop3 = document.createElementNS(svgNS, 'stop');
+            stop3.setAttribute('offset', '100%');
+            stop3.setAttribute('stop-color', '#ff6b6b');
+            stop3.setAttribute('stop-opacity', '0.6');
+            
+            timeGradient.appendChild(stop1);
+            timeGradient.appendChild(stop2);
+            timeGradient.appendChild(stop3);
+            defs.appendChild(timeGradient);
+
+            // Enhanced current time line with glow effect
             const nowHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: tzET }));
             const xNow = x(nowHour);
+            
+            // Glow effect for current time line
+            const vlineGlow = document.createElementNS(svgNS, 'line');
+            vlineGlow.setAttribute('x1', xNow);
+            vlineGlow.setAttribute('x2', xNow);
+            vlineGlow.setAttribute('y1', '0');
+            vlineGlow.setAttribute('y2', String(rect.height));
+            vlineGlow.setAttribute('stroke', '#ff6b6b');
+            vlineGlow.setAttribute('stroke-width', '6');
+            vlineGlow.setAttribute('stroke-opacity', '0.3');
+            vlineGlow.setAttribute('stroke-dasharray', '8,4');
+            vlineGlow.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(vlineGlow);
+            
+            // Main current time line
             const vline = document.createElementNS(svgNS, 'line');
             vline.setAttribute('x1', xNow);
             vline.setAttribute('x2', xNow);
             vline.setAttribute('y1', '0');
             vline.setAttribute('y2', String(rect.height));
-            vline.setAttribute('stroke', 'rgba(255, 99, 132, 0.85)');
-            vline.setAttribute('stroke-width', '2');
-            vline.setAttribute('stroke-dasharray', '4,6');
+            vline.setAttribute('stroke', 'url(#timeLineGradient)');
+            vline.setAttribute('stroke-width', '2.5');
+            vline.setAttribute('stroke-dasharray', '8,4');
+            vline.setAttribute('stroke-linecap', 'round');
             svg.appendChild(vline);
 
             // X-axis labels at fixed hours

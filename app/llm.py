@@ -20,6 +20,8 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2:7b-instruct-q5_K_M")
 OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "5.0"))
 
+# Kid-friendly output is always enabled by design
+
 # Configure Ollama client
 client = Client(host=OLLAMA_HOST)
 
@@ -83,7 +85,7 @@ check_ollama_available()
 
 
 def get_basic_weather_summary(weather_data: Dict) -> str:
-    """Generate a basic weather summary without using LLM."""
+    """Generate a basic weather summary without using LLM, in kid-friendly wording."""
     temp = weather_data["temp"]
     feels_like = weather_data["feels_like"]
     conditions = weather_data["conditions"]
@@ -97,11 +99,55 @@ def get_basic_weather_summary(weather_data: Dict) -> str:
         " tonight" if weather_data.get("time_of_day") == "night" else " today"
     )
 
-    return f"It's {temp}°F{location_text}{time_context} (feels like {feels_like}°F) with {conditions}."
+    # Very simple, short sentences
+    return (
+        f"<p>It is {temp}°F{location_text}{time_context}. It feels like {feels_like}°F.</p>"
+        f"<p>The sky: {conditions}.</p>"
+    )
+
+
+def _build_kid_friendly_summary_prompt(weather_data: Dict, relevant_periods: Dict, current_hour: int) -> str:
+    """Build a very simple prompt for a child-friendly daily summary.
+
+    Output should be tiny, easy words, and short bullets.
+    """
+    return f"""
+You are talking to a young child (about 5 years old).
+Use tiny words and short sentences. Be kind and clear.
+
+Make 3 to 5 short bullet points about TODAY only. Use simple emojis.
+Say what it feels like and if it is warm or cold, wet or dry, windy or calm.
+End with one short line that starts with: Wear:
+
+Current right now: {weather_data['temp']}°F (feels like {weather_data['feels_like']}°F), {weather_data['conditions']}.
+
+Today (by parts of day) data:
+{json.dumps(relevant_periods, indent=2)}
+
+Rules:
+- Keep each bullet under 8 words
+- Use words like warm, cold, hot, cool, sunny, cloudy, rainy, windy
+- No numbers unless for temperature
+- Do not mention hours or times, just morning/afternoon/evening
+- No paragraphs, only bullets and the final Wear line
+
+Format exactly like this with HTML tags:
+<ul>
+  <li>Simple point with an emoji</li>
+  <li>Another simple point</li>
+  <li>One more simple point</li>
+</ul>
+<p>Wear: simple list, like "coat and boots"</p>
+
+Focus on what is still ahead based on the current time ({current_hour}:00).
+"""
 
 
 def get_weather_summary(weather_data: Dict) -> str:
-    """Get a comprehensive AI-generated weather summary for the entire day."""
+    """Get an AI-generated weather summary for the day, always kid-friendly.
+
+    Produces very simple bullets suitable for a 5-year-old, plus a one-line wear suggestion.
+    """
     if not ollama_available:
         return get_basic_weather_summary(weather_data)
 
@@ -225,52 +271,8 @@ def get_weather_summary(weather_data: Dict) -> str:
         # Filter periods data to only include relevant periods
         relevant_periods = {k: v for k, v in periods_data.items() if k in periods_to_include and v is not None}
         
-        # Create a prompt for the LLM to generate a comprehensive daily forecast with bullet points
-        prompt = f"""Create a concise, bullet-point weather forecast that describes how the weather will change throughout the day. 
-
-Current conditions: {weather_data['temp']}°F (feels like {weather_data['feels_like']}°F) with {weather_data['conditions']}.
-
-Forecast data for today:
-{json.dumps(relevant_periods, indent=2)}
-
-Guidelines:
-1. Use BULLET POINTS for each key piece of information (not paragraphs)
-2. Be SPECIFIC about temperature trends (rising, falling, steady)
-3. Be SPECIFIC about weather conditions and when they might change
-4. Focus on what's most relevant based on the current time ({current_hour}:00)
-5. Make it practical for someone deciding what to wear
-6. Include wind, precipitation, or other notable factors if present
-7. Keep each bullet point SHORT and FOCUSED (5-10 words when possible)
-
-Format your response with clear sections for each part of the day that's still relevant:
-- If it's morning or earlier, include sections for morning, afternoon, and evening
-- If it's afternoon, include sections for afternoon and evening
-- If it's evening, just include the evening section
-
-Use this format with HTML tags:
-<h3>This Morning</h3>
-<ul>
-  <li>Temperature: 45-52°F, rising throughout morning</li>
-  <li>Conditions: Light rain until 10am</li>
-  <li>Wind: Light, 5-10 mph</li>
-</ul>
-
-<h3>This Afternoon</h3>
-<ul>
-  <li>Temperature: 52-58°F, steady</li>
-  <li>Conditions: Partly cloudy</li>
-  <li>Wind: Moderate, 10-15 mph</li>
-</ul>
-
-<h3>This Evening</h3>
-<ul>
-  <li>Temperature: 48-52°F, falling after sunset</li>
-  <li>Conditions: Clear skies</li>
-  <li>Wind: Light, 5 mph</li>
-</ul>
-
-Only include sections for times that are still relevant based on the current time ({current_hour}:00).
-"""
+        # Create a prompt for the LLM (always kid-friendly)
+        prompt = _build_kid_friendly_summary_prompt(weather_data, relevant_periods, current_hour)
 
         # Get the forecast from the LLM
         response = client.chat(
@@ -282,7 +284,7 @@ Only include sections for times that are still relevant based on the current tim
         print(f"[DEBUG] LLM response preview: {summary[:100]}...")
         
         # If the LLM didn't return HTML formatted content, add basic formatting
-        if "<h3>" not in summary:
+        if "<h3>" not in summary and "<ul>" not in summary:
             print("[DEBUG] Adding HTML formatting to LLM response")
             # Split by newlines and look for section headers
             lines = summary.split('\n')
@@ -348,13 +350,10 @@ async def get_clothing_recommendations(
     summary = get_weather_summary(weather_data)
     print(f"[DEBUG] Generated weather summary: {summary[:100]}...")
     
-    # Skip validation for HTML content as it will strip the HTML tags
-    # Only validate if it's a basic summary (no HTML tags)
-    if "<h3>" not in summary and "<p>" not in summary:
-        summary = await validate_summary_ai(weather_data, summary)
-        print("[DEBUG] Validated basic summary with pydantic-ai")
-    else:
-        print("[DEBUG] Skipping validation for HTML summary to preserve formatting")
+    # Always validate the summary with pydantic-ai to enforce kid-friendly output.
+    # The agent is designed to return short HTML bullets plus a Wear line.
+    summary = await validate_summary_ai(weather_data, summary)
+    print("[DEBUG] Validated summary with pydantic-ai")
 
     # Get safety recommendations (these don't use LLM)
     safety_recs = safety.get_safety_recommendations(weather_data)
@@ -367,33 +366,30 @@ async def get_clothing_recommendations(
         return summary, safety_recs, clothing_recs
 
     try:
-        # Try to get AI-powered clothing recommendations
-        prompt = f"""Based on these weather conditions and safety considerations, create clear, well-formatted clothing recommendations.
+        # Try to get AI-powered clothing recommendations (always kid-friendly)
+        prompt = f"""You are helping a young child (about 5 years old) get dressed.
+Use tiny words. Be kind and clear. No long sentences.
 
-Format each recommendation like this:
-👕 Base Layer: [recommendation]
-👖 Bottoms: [recommendation]
-🧥 Mid Layer: [recommendation] (if needed)
-🧥 Outer Layer: [recommendation] (if needed)
-🧤 Accessories: [recommendation]
-👟 Footwear: [recommendation]
+Make these 6 lines, each starting with the emoji and category:
+👕 Base Layer: simple words (e.g., long-sleeve tee)
+👖 Bottoms: simple words (e.g., jeans)
+🧥 Mid Layer: only if needed
+🧥 Outer Layer: only if needed
+🧤 Accessories: hat, gloves, umbrella, etc.
+👟 Footwear: shoes or boots
 
-Guidelines:
-• Start each item with an appropriate emoji
-• Use clear, everyday language
-• Only include layers needed for the weather
-• Focus on both comfort and weather protection
-• Keep descriptions concise but specific
-• If certain layers aren't needed, skip them
-• Consider both style and practicality
+Rules:
+- Use short, simple words
+- Keep each line under 8 words
+- Match the weather and safety notes
 
 Weather data:
 {json.dumps(weather_data, indent=2)}
 
-Safety considerations:
+Safety notes:
 {json.dumps(safety_recs, indent=2)}
 
-Provide recommendations in the exact format shown above, maintaining consistent emoji usage and formatting."""
+Return only those 6 lines (skip a line if not needed)."""
 
         response = client.chat(
             model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}]
