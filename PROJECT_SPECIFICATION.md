@@ -38,6 +38,7 @@ A weather-based clothing recommendation web application that provides intelligen
 - **Mobile Responsive**: Works on all device sizes
 - **Error Handling**: Graceful degradation with fallback data
 - **Loading States**: Clear feedback during API calls
+- **System Information**: Footer displays Ollama model and app version
 
 ## Technical Architecture
 
@@ -156,6 +157,7 @@ OLLAMA_TIMEOUT=10.0
 - **Intuitive Interface**: Self-explanatory interactions
 - **Reliable Operation**: Graceful degradation
 - **Mobile First**: Touch-optimized design
+- **System Transparency**: Footer displays current Ollama model and application version
 
 ## Success Criteria
 

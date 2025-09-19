@@ -5,11 +5,7 @@ services:
       - "8083:8000"
     volumes:
       - ./app:/app/app
-    environment:
-      - OLLAMA_HOST=http://babyblue-aurora:11434
-      - OLLAMA_TIMEOUT=10.0
-    extra_hosts:
-      - "babyblue-aurora:host-gateway"
+    env_file: .env
     restart: unless-stopped
 
 #   ollama:

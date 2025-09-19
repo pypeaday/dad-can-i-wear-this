@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if error %}
+<div class="error-message">
+    <h2>⚠️ Error</h2>
+    <p>{{ error }}</p>
+    <a href="/" class="back-btn">Try Again</a>
+</div>
+{% else %}
+<div class="weather-results">
+    <div class="location-header">
+        <h2>📍 {{ weather_data.location.name }}, {{ weather_data.location.country }}</h2>
+        <a href="/" class="back-btn">New Search</a>
+    </div>
+    
+    <div class="current-weather">
+        <div class="current-temp">
+            <span class="temp-value">{{ weather_data.current.temperature }}°F</span>
+            <span class="feels-like">Feels like {{ weather_data.current.feels_like }}°F</span>
+        </div>
+        <div class="current-conditions">
+            <p class="description">{{ weather_data.current.description }}</p>
+            <div class="weather-details">
+                <span>💨 {{ weather_data.current.wind_speed }} mph</span>
+                <span>💧 {{ weather_data.current.humidity }}%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Temperature Graph -->
+    <div class="temperature-graph-container">
+        <h3>24-Hour Temperature Forecast</h3>
+        <div id="temperature-graph" class="temperature-graph">
+            <!-- Graph will be rendered here by JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Clothing Recommendations -->
+    <div class="recommendations">
+        <h3>👕 Clothing Recommendations</h3>
+        <div class="recommendation-content">
+            {{ recommendations | replace('\n', '<br>') | safe }}
+        </div>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if weather_data %}
+<script src="{{ url_for('static', path='/js/temperature-graph.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Embed weather data directly as JavaScript object
+    const weatherData = {{ weather_data | tojson | safe }};
+    
+    if (weatherData && weatherData.current) {
+        console.log('🌤️ Weather data loaded successfully');
+        renderTemperatureGraph(weatherData);
+    } else {
+        console.error('❌ Invalid weather data structure');
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

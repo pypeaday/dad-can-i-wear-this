@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="weather-form">
+    <form method="post" action="/weather">
+        <div class="form-group">
+            <label for="zip_code">Enter your ZIP code:</label>
+            <input 
+                type="text" 
+                id="zip_code" 
+                name="zip_code" 
+                value="{{ default_zip_code }}" 
+                placeholder="12345"
+                pattern="[0-9]{5}"
+                required
+            >
+        </div>
+        <button type="submit" class="submit-btn">
+            Get Weather & Clothing Advice
+        </button>
+    </form>
+</div>
+
+<div class="info-section">
+    <h2>How it works</h2>
+    <div class="features">
+        <div class="feature">
+            <span class="icon">🌡️</span>
+            <h3>Weather Analysis</h3>
+            <p>Real-time weather data and 24-hour forecasts</p>
+        </div>
+        <div class="feature">
+            <span class="icon">📊</span>
+            <h3>Temperature Visualization</h3>
+            <p>Beautiful graphs showing temperature trends</p>
+        </div>
+        <div class="feature">
+            <span class="icon">👕</span>
+            <h3>Smart Recommendations</h3>
+            <p>AI-powered clothing suggestions for any weather</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
