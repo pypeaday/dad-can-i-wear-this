@@ -301,6 +301,45 @@ footer .system-info span {
     margin: 0 4px;
 }
 
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.spinner-ring {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.submit-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 200px;
+    transition: all 0.3s ease;
+}
+
+.submit-btn:disabled {
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+.submit-btn .btn-text,
+.submit-btn .spinner {
+    transition: all 0.3s ease;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
