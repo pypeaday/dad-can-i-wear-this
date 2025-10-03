@@ -23,6 +23,16 @@
                 <span>App v{{ app_version }}</span>
                 <span>•</span>
                 <span>Model: {{ ollama_model }}</span>
+                <span>•</span>
+                <span class="ollama-status ollama-{{ ollama_status }}">
+                    {% if ollama_available %}
+                        ✓ LLM Ready
+                    {% elif ollama_status == 'model_missing' %}
+                        ⚠ Model Missing
+                    {% else %}
+                        ✗ LLM Offline
+                    {% endif %}
+                </span>
             </div>
         </footer>
     </div>

@@ -32,9 +32,12 @@ llm_service = ClothingRecommendationService()
 
 def get_system_info():
     """Get system information for footer display."""
+    ollama_health = llm_service.check_health()
     return {
         "app_version": __version__,
-        "ollama_model": os.getenv("OLLAMA_MODEL", "qwen2:7b-instruct-q5_K_M")
+        "ollama_model": os.getenv("OLLAMA_MODEL", "qwen2:7b-instruct-q5_K_M"),
+        "ollama_status": ollama_health["status"],
+        "ollama_available": ollama_health["available"]
     }
 
 @app.get("/", response_class=HTMLResponse)
