@@ -7,6 +7,12 @@ services:
       - ./app:/app/app
     env_file: .env
     restart: unless-stopped
+    networks:
+      - phantomlink
+
+networks:
+  phantomlink:
+    external: true
 
 #   ollama:
 #     image: ollama/ollama:latest
