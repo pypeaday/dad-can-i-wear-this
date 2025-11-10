@@ -16,4 +16,4 @@ jobs:
         with:
           repoflow_workspace: foo
           repoflow_password: ${{ secrets.REPOFLOW_PASSWORD_RW }}
-          repoflow_username: ${{ secrets.REPOFLOW_USER_RW }}
+          repoflow_user: ${{ secrets.REPOFLOW_USER_RW }}
