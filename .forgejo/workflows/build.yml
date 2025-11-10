@@ -15,3 +15,5 @@ jobs:
       - uses: https://git.paynepride.com/nic/homelab-mono/devops/ci/forgejo-actions/docker-build-push@main
         with:
           repoflow_workspace: foo
+          repoflow_password: ${{ secrets.REPOFLOW_PASSWORD_RW }}
+          repoflow_username: ${{ secrets.REPOFLOW_USER_RW }}
